@@ -386,7 +386,20 @@ if not df.empty:
     
     unverified_count = int(ps_norm.isin(unverified_set).sum()) if not ps_norm.empty else 0
     kyc_verified_count = int(ps_norm.isin(kyc_set).sum()) if not ps_norm.empty else 0
-    banned_count = int(ps_norm.eq("banned").sum()) if not ps_norm.empty else 0
+    # ---- Robust banned count ----
+    banned_count = 0
+    if not ps_norm.empty:
+        # match any variant that contains the word 'banned' (case-insensitive)
+        banned_count = int(ps_norm.str.contains(r"\bbanned\b", na=False).sum())
+    
+    # Fallbacks if profile_status is empty or has none
+    if banned_count == 0:
+        if "is_banned" in fdf.columns:
+            banned_count = int(fdf["is_banned"].fillna(False).astype(bool).sum())
+        elif "status" in fdf.columns:
+            banned_count = int(
+                fdf["status"].astype(str).str.strip().str.lower().str.contains(r"\bbanned\b", na=False).sum()
+            )
     
     # Finance sums
     usd_spent = float(fdf.get("usd_spent_total", 0).fillna(0).sum())
