@@ -553,39 +553,66 @@ if not df.empty:
         hide_index=True,
     )
 
-
-     # -----------------------------
+    # -----------------------------
     # Dropped-off at Signup (Unverified ONLY)
     # -----------------------------
     st.markdown("### Users that dropped off at signup")
     
-    # Prefer 'player_status' if present; else fall back to 'profile_status'
+    # Choose data source to avoid accidentally hiding real unverified users
+    source_choice = st.radio(
+        "Show from:",
+        ["All data (ignore page filters)", "Use page filters"],
+        horizontal=True,
+        help="If unverified users are missing, they may have been filtered out earlier. "
+             "Use 'All data' to ignore page filters for this list (but still exclude junk emails)."
+    )
+    
+    # Pick the frame: df = all cleaned data, fdf = filtered view
+    base_frame = df if source_choice.startswith("All data") else fdf
+    
+    # Always exclude junk emails per your rule
+    exclude_keywords = ["test", "prod", "yopmail", "rawleigh"]
+    email_pattern = "|".join(exclude_keywords)
+    if "email" in base_frame.columns:
+        base_frame = base_frame[~base_frame["email"].astype(str).str.contains(email_pattern, case=False, na=False)]
+    
+    # Prefer 'player_status' then fall back to 'profile_status'
     status_source_col = (
-        "player_status" if "player_status" in fdf.columns
-        else ("profile_status" if "profile_status" in fdf.columns else None)
+        "player_status" if "player_status" in base_frame.columns
+        else ("profile_status" if "profile_status" in base_frame.columns else None)
     )
     
     if status_source_col is None:
         st.info("No player/profile status column found.")
     else:
         ps_norm = (
-            fdf[status_source_col]
+            base_frame[status_source_col]
             .astype(str)
             .str.strip()
             .str.lower()
         )
     
-        # Include ONLY exact matches to "unverified"
-        mask_unverified = ps_norm.eq("unverified")
+        # EXACTLY "unverified" (not "unverified np" or "unverified p")
+        mask_unverified_exact = ps_norm.eq("unverified")
     
         dropped = (
-            fdf.loc[mask_unverified, [c for c in ["username", "email"] if c in fdf.columns]]
+            base_frame.loc[mask_unverified_exact, [c for c in ["username", "email"] if c in base_frame.columns]]
             .copy()
         )
     
+        # Small summary comparing against fully filtered view (optional)
+        summary_note = ""
+        if source_choice.startswith("All data") and status_source_col is not None:
+            # Count how many unverified remain after page filters too (fdf)
+            if not fdf.empty and status_source_col in fdf.columns:
+                ps_f = fdf[status_source_col].astype(str).str.strip().str.lower()
+                filtered_count = int(ps_f.eq("unverified").sum())
+                summary_note = f" (Visible with page filters: **{filtered_count:,}**)"
+        
         if dropped.empty:
-            st.info("No users with player_status = 'unverified' found.")
+            st.info("No users with status exactly 'unverified' found." + summary_note)
         else:
+            st.caption(f"Found **{len(dropped):,}** unverified user(s){summary_note}.")
             dropped["tag"] = "Users that dropped off at signup"
             st.dataframe(dropped, use_container_width=True, hide_index=True)
     
