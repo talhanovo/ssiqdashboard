@@ -395,29 +395,29 @@ if not df.empty:
 
     # Players over time (by createdAt)
     if "createdAt" in fdf.columns:
-    created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
-    if created_parsed.notna().any():
-        monthly = (
-            pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
-            .dropna()
-            .groupby("month").size().reset_index(name="new_players")
-            .sort_values("month")
+        created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
+        if created_parsed.notna().any():
+            monthly = (
+                pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
+                .dropna()
+                .groupby("month").size().reset_index(name="new_players")
+                .sort_values("month")
         )
 
         # Optional: limit to last 12 months (uncomment if desired)
         # if len(monthly) > 12:
         #     monthly = monthly.tail(12)
 
-        ch_month = alt.Chart(monthly).mark_bar().encode(
-            x=alt.X("month:T", title="Month"),
-            y=alt.Y("new_players:Q", title="New players"),
-            tooltip=[alt.Tooltip("month:T", title="Month"),
-                     alt.Tooltip("new_players:Q", title="New players")]
-        ).properties(height=320, title="New Players by Month")
+            ch_month = alt.Chart(monthly).mark_bar().encode(
+                x=alt.X("month:T", title="Month"),
+                y=alt.Y("new_players:Q", title="New players"),
+                tooltip=[alt.Tooltip("month:T", title="Month"),
+                         alt.Tooltip("new_players:Q", title="New players")]
+            ).properties(height=320, title="New Players by Month")
 
-        chart_cols[1].altair_chart(ch_month, use_container_width=True)
-    else:
-        chart_cols[1].write("No valid dates found in `createdAt` to build monthly counts.")
+            chart_cols[1].altair_chart(ch_month, use_container_width=True)
+        else:
+            chart_cols[1].write("No valid dates found in `createdAt` to build monthly counts.")
 
     # Country distribution
     # State distribution (US-only view)
