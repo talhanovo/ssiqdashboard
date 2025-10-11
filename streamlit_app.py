@@ -536,23 +536,44 @@ if not df.empty:
     # Players Table
     # -----------------------------
     st.markdown("### Players (filtered)")
+    
+    # Only include these specific columns
     show_cols_default = [
-        "_id", "username", "email", "name", "country", "state", "status_simple", "is_banned",
-        "createdAt", "updatedAt",
-        "contests_count_total", "lineups_count_total", "contests_list_count",
-        "usd_spent_total", "usd_won_total", "usd_deposit_total", "usd_net_total", "usd_wallet_balance",
-        "usd_won_to_spent_ratio", "computed_usd_won_to_spent_ratio",
+        "username",
+        "name",
+        "contests_count_total",
+        "lineups_count_total",
+        "contests_participated",
+        "referral_code",
+        "referral_count",
+        "usd_wallet_balance",
+        "usd_spent_total",
+        "usd_won_total",
+        "usd_deposit_total",
+        "usd_withdraw_net_total",
     ]
+    
+    # Keep only columns that actually exist in the dataset
     table_cols = [c for c in show_cols_default if c in fdf.columns]
+    
+    # Display filtered table
     st.dataframe(
         fdf[table_cols].sort_values(
-            by=[c for c in ["usd_spent_total", "usd_won_total", "createdAt"] if c in table_cols],
+            by=[c for c in ["usd_spent_total", "usd_won_total", "createdAt"] if c in fdf.columns],
             ascending=[False, False, True]
         ).reset_index(drop=True),
         use_container_width=True,
         hide_index=True,
     )
-
+    
+    # CSV download for the filtered dataset
+    csv = fdf[table_cols].to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download filtered CSV",
+        csv,
+        file_name="players_filtered.csv",
+        mime="text/csv",
+    )
     # -----------------------------
     # Dropped-off at Signup (Unverified ONLY)
     # -----------------------------
