@@ -368,25 +368,42 @@ if not df.empty:
     # KPIs
     # -----------------------------
     total_players = len(fdf)
-    onboarded = int((fdf.get("status_simple", "") == "Onboarded").sum()) if "status_simple" in fdf.columns else 0
-    onboarding = int((fdf.get("status_simple", "") == "Onboarding").sum()) if "status_simple" in fdf.columns else 0
-    banned = int(fdf.get("is_banned", pd.Series([False]*len(fdf))).sum())
-
+    
+    # Normalize profile_status safely
+    if "profile_status" in fdf.columns:
+        ps_norm = (
+            fdf["profile_status"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+    else:
+        ps_norm = pd.Series([], dtype="object")
+    
+    # Buckets
+    unverified_set = {"unverified", "unverified np", "unverified p"}
+    kyc_set = {"grade-i", "grade-ii", "grade-iii"}
+    
+    unverified_count = int(ps_norm.isin(unverified_set).sum()) if not ps_norm.empty else 0
+    kyc_verified_count = int(ps_norm.isin(kyc_set).sum()) if not ps_norm.empty else 0
+    banned_count = int(ps_norm.eq("banned").sum()) if not ps_norm.empty else 0
+    
+    # Finance sums
     usd_spent = float(fdf.get("usd_spent_total", 0).fillna(0).sum())
     usd_won = float(fdf.get("usd_won_total", 0).fillna(0).sum())
     usd_deposit = float(fdf.get("usd_deposit_total", 0).fillna(0).sum())
     usd_net = float(fdf.get("usd_net_total", 0).fillna(0).sum())
     usd_wallet = float(fdf.get("usd_wallet_balance", 0).fillna(0).sum())
-
+    
     st.subheader("Key Metrics")
     kpi_cols = st.columns(6)
     kpi_cols[0].metric("Players", f"{total_players:,}")
-    kpi_cols[1].metric("Onboarded", f"{onboarded:,}")
-    kpi_cols[2].metric("Onboarding", f"{onboarding:,}")
-    kpi_cols[3].metric("Banned", f"{banned:,}")
+    kpi_cols[1].metric("Unverified", f"{unverified_count:,}")
+    kpi_cols[2].metric("KYC Verified", f"{kyc_verified_count:,}")
+    kpi_cols[3].metric("Banned", f"{banned_count:,}")
     kpi_cols[4].metric("USD Spent (Σ)", f"${usd_spent:,.0f}")
     kpi_cols[5].metric("USD Won (Σ)", f"${usd_won:,.0f}")
-
+    
     # Secondary KPIs row
     kpi2 = st.columns(4)
     kpi2[0].metric("USD Deposits (Σ)", f"${usd_deposit:,.0f}")
@@ -396,7 +413,7 @@ if not df.empty:
         kpi2[3].metric("Pooled ROI (won/spent)", f"{usd_won/usd_spent:,.2f}×")
     else:
         kpi2[3].metric("Pooled ROI (won/spent)", "–")
-
+    
     st.markdown("---")
 
     # -----------------------------
