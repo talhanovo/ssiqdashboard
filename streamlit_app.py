@@ -260,16 +260,23 @@ if not df.empty:
     # -----------------------------
     st.sidebar.header("🔎 Filters")
 
-    # Date range filter (createdAt)
-    min_date = pd.to_datetime(df["createdAt"].min()) if "createdAt" in df.columns else None
-    max_date = pd.to_datetime(df["createdAt"].max()) if "createdAt" in df.columns else None
-    if min_date is not None and max_date is not None:
-        start_date, end_date = st.sidebar.date_input(
-            "Created date range",
-            value=(min_date.date(), max_date.date()),
-            min_value=min_date.date(),
-            max_value=max_date.date(),
-        )
+    # Date range filter (createdAt) — robust to mixed types/empty strings/NaN
+    if "createdAt" in df.columns:
+        created_series = pd.to_datetime(df["createdAt"], errors="coerce")
+        if created_series.notna().any():
+            min_date = created_series.min()
+            max_date = created_series.max()
+            # Coerce to date for widget (avoid min/max on mixed dtypes)
+            start_date_default = min_date.date()
+            end_date_default = max_date.date()
+            start_date, end_date = st.sidebar.date_input(
+                "Created date range",
+                value=(start_date_default, end_date_default),
+                min_value=start_date_default,
+                max_value=end_date_default,
+            )
+        else:
+            start_date, end_date = None, None
     else:
         start_date, end_date = None, None
 
