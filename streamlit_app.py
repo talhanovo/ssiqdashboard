@@ -413,19 +413,36 @@ if not df.empty:
             chart_cols[1].write("No valid dates found in `createdAt` for time series.")
 
     # Country distribution
-    if "country" in fdf.columns:
-        st.markdown("### Geography")
-        top_countries = (
-            fdf.groupby("country").size().reset_index(name="players").sort_values("players", ascending=False)
-        )
-        ch3 = alt.Chart(top_countries).mark_bar().encode(
-            x=alt.X("players:Q", title="Players"),
-            y=alt.Y("country:N", sort='-x', title="Country"),
-            tooltip=["country", "players"]
-        ).properties(height=380, title="Players by Country")
-        st.altair_chart(ch3, use_container_width=True)
+    # State distribution (US-only view)
+    if "state" in fdf.columns:
+        st.markdown("### Geography (States)")
 
-    st.markdown("---")
+    # Clean up state values a bit
+        state_series = (
+        fdf["state"]
+        .astype(str)
+        .str.strip()
+        .replace({"": np.nan, "nan": np.nan, "None": np.nan})
+    )
+
+        top_states = (
+        state_series.dropna()
+        .to_frame("state")
+        .groupby("state").size()
+        .reset_index(name="players")
+        .sort_values("players", ascending=False)
+    )
+
+        if not top_states.empty:
+            ch_state = alt.Chart(top_states).mark_bar().encode(
+                x=alt.X("players:Q", title="Players"),
+                y=alt.Y("state:N", sort='-x', title="State"),
+                tooltip=["state", "players"]
+            ).properties(height=380, title="Players by State")
+            st.altair_chart(ch_state, use_container_width=True)
+        else:
+            st.info("No state data available to display.")
+
 
     # Finance distributions
     if any(col in fdf.columns for col in ["usd_spent_total", "usd_won_total", "computed_usd_won_to_spent_ratio", "usd_won_to_spent_ratio"]):
