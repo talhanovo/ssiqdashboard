@@ -531,7 +531,6 @@ if not df.empty:
                 fin_cols[1].altair_chart(ch5, use_container_width=True)
 
     st.markdown("---")
-
     # -----------------------------
     # Players Table
     # -----------------------------
@@ -556,24 +555,32 @@ if not df.empty:
     # Keep only columns that actually exist in the dataset
     table_cols = [c for c in show_cols_default if c in fdf.columns]
     
-    # Display filtered table
+    # Sort only by keys that are present in the *displayed* columns
+    preferred_sort_order = ["usd_spent_total", "usd_won_total"]  # drop "createdAt"
+    sort_keys = [c for c in preferred_sort_order if c in table_cols]
+    
+    df_display = fdf[table_cols].copy()
+    if sort_keys:
+        df_display = df_display.sort_values(
+            by=sort_keys,
+            ascending=[False] * len(sort_keys)
+        )
+    
     st.dataframe(
-        fdf[table_cols].sort_values(
-            by=[c for c in ["usd_spent_total", "usd_won_total", "createdAt"] if c in fdf.columns],
-            ascending=[False, False, True]
-        ).reset_index(drop=True),
+        df_display.reset_index(drop=True),
         use_container_width=True,
         hide_index=True,
     )
     
     # CSV download for the filtered dataset
-    csv = fdf[table_cols].to_csv(index=False).encode("utf-8")
+    csv = df_display.to_csv(index=False).encode("utf-8")
     st.download_button(
         "Download filtered CSV",
         csv,
         file_name="players_filtered.csv",
         mime="text/csv",
     )
+
     # -----------------------------
     # Dropped-off at Signup (Unverified ONLY)
     # -----------------------------
