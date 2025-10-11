@@ -553,6 +553,50 @@ if not df.empty:
         hide_index=True,
     )
 
+
+    # -----------------------------
+# Dropped-off at Signup (Unverified)
+# -----------------------------
+    st.markdown("### Users that dropped off at signup")
+    
+    # Prefer 'player_status' if present; else fall back to 'profile_status'
+    status_source_col = (
+        "player_status" if "player_status" in fdf.columns
+        else ("profile_status" if "profile_status" in fdf.columns else None)
+    )
+    
+    if status_source_col is None:
+        st.info("No player/profile status column found.")
+    else:
+        ps_norm = (
+            fdf[status_source_col]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+    
+        # Exactly "unverified" OR any variant that starts with "unverified" (e.g., "unverified np")
+        mask_unverified = ps_norm.eq("unverified") | ps_norm.str.startswith("unverified")
+    
+        dropped = (
+            fdf.loc[mask_unverified, [c for c in ["username", "email"] if c in fdf.columns]]
+            .copy()
+        )
+    
+        if dropped.empty:
+            st.info("No unverified users found.")
+        else:
+            dropped["tag"] = "Users that dropped off at signup"
+            st.dataframe(dropped, use_container_width=True, hide_index=True)
+    
+            # CSV download
+            st.download_button(
+                "Download dropped-off users CSV",
+                dropped.to_csv(index=False).encode("utf-8"),
+                file_name="dropped_off_users.csv",
+                mime="text/csv",
+            )
+
     # CSV download for the filtered dataset
     csv = fdf.to_csv(index=False).encode("utf-8")
     st.download_button("Download filtered CSV", csv, file_name="players_filtered.csv", mime="text/csv")
