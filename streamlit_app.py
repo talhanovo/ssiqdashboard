@@ -342,6 +342,29 @@ if not df.empty:
     # -------------------------------------------
 
     # -----------------------------
+    # Engagement Metrics (NEW)
+    # -----------------------------
+    st.subheader("Engagement Metrics")
+    active_users = (
+        int(fdf["active_user"].astype(str).str.strip().str.lower().eq("yes").sum())
+        if "active_user" in fdf.columns else 0
+    )
+    activated_users = (
+        int(fdf["activated_user"].astype(str).str.strip().str.lower().eq("yes").sum())
+        if "activated_user" in fdf.columns else 0
+    )
+    demo_completed = (
+        int(fdf["demo_status"].astype(str).str.strip().str.lower().eq("completed").sum())
+        if "demo_status" in fdf.columns else 0
+    )
+    em_cols = st.columns(3)
+    em_cols[0].metric("Active Users", f"{active_users:,}")
+    em_cols[1].metric("Activated Users", f"{activated_users:,}")
+    em_cols[2].metric("Demo Completed", f"{demo_completed:,}")
+
+    st.markdown("---")
+
+    # -----------------------------
     # KPIs
     # -----------------------------
     total_players = len(fdf)
@@ -393,7 +416,7 @@ if not df.empty:
         ).properties(height=320, title="Players by Status")
         chart_cols[0].altair_chart(ch1, use_container_width=True)
 
-    # Players over time (by createdAt)
+    # New players by Month (based on createdAt)
     if "createdAt" in fdf.columns:
         created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
         if created_parsed.notna().any():
@@ -402,11 +425,11 @@ if not df.empty:
                 .dropna()
                 .groupby("month").size().reset_index(name="new_players")
                 .sort_values("month")
-        )
+            )
 
-        # Optional: limit to last 12 months (uncomment if desired)
-        # if len(monthly) > 12:
-        #     monthly = monthly.tail(12)
+            # Optional: limit to last 12 months
+            # if len(monthly) > 12:
+            #     monthly = monthly.tail(12)
 
             ch_month = alt.Chart(monthly).mark_bar().encode(
                 x=alt.X("month:T", title="Month"),
@@ -419,26 +442,25 @@ if not df.empty:
         else:
             chart_cols[1].write("No valid dates found in `createdAt` to build monthly counts.")
 
-    # Country distribution
     # State distribution (US-only view)
     if "state" in fdf.columns:
         st.markdown("### Geography (States)")
 
-    # Clean up state values a bit
+        # Clean up state values a bit
         state_series = (
-        fdf["state"]
-        .astype(str)
-        .str.strip()
-        .replace({"": np.nan, "nan": np.nan, "None": np.nan})
-    )
+            fdf["state"]
+            .astype(str)
+            .str.strip()
+            .replace({"": np.nan, "nan": np.nan, "None": np.nan})
+        )
 
         top_states = (
-        state_series.dropna()
-        .to_frame("state")
-        .groupby("state").size()
-        .reset_index(name="players")
-        .sort_values("players", ascending=False)
-    )
+            state_series.dropna()
+            .to_frame("state")
+            .groupby("state").size()
+            .reset_index(name="players")
+            .sort_values("players", ascending=False)
+        )
 
         if not top_states.empty:
             ch_state = alt.Chart(top_states).mark_bar().encode(
@@ -449,7 +471,6 @@ if not df.empty:
             st.altair_chart(ch_state, use_container_width=True)
         else:
             st.info("No state data available to display.")
-
 
     # Finance distributions
     if any(col in fdf.columns for col in ["usd_spent_total", "usd_won_total", "computed_usd_won_to_spent_ratio", "usd_won_to_spent_ratio"]):
