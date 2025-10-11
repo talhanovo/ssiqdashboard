@@ -331,15 +331,17 @@ if not df.empty:
         if text_cols:
             fdf = fdf[fdf[text_cols].astype(str).apply(lambda row: any(qq in str(v).lower() for v in row), axis=1)]
 
-    # ------- Hard filters (your request) -------
-    # 1) Exclude emails containing "test" (case-insensitive)
+    # ------- Hard filters (expanded email exclusions + US-only) -------
     if "email" in fdf.columns:
-        fdf = fdf[~fdf["email"].astype(str).str.contains(r"test", case=False, na=False)]
+        # Remove any email containing these keywords (case-insensitive)
+        exclude_keywords = ["test", "prod", "yopmail", "rawleigh"]
+        pattern = "|".join(exclude_keywords)
+        fdf = fdf[~fdf["email"].astype(str).str.contains(pattern, case=False, na=False)]
 
-    # 2) Only include users where country == "United States" (case-insensitive)
+    # Only include users where country == "United States" (case-insensitive)
     if "country" in fdf.columns:
         fdf = fdf[fdf["country"].astype(str).str.strip().str.lower() == "united states"]
-    # -------------------------------------------
+    # -------------------------------------------------------------------
 
     # -----------------------------
     # Engagement Metrics (NEW)
