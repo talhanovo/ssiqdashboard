@@ -379,17 +379,22 @@ if not df.empty:
 
     # Players over time (by createdAt)
     if "createdAt" in fdf.columns:
-        by_day = (
-            fdf.assign(day=fdf["createdAt"].dt.date)
-               .groupby("day").size().reset_index(name="new_players")
-        )
-        by_day["cumulative"] = by_day["new_players"].cumsum()
-        ch2 = alt.Chart(by_day).mark_line(point=True).encode(
-            x=alt.X("day:T", title="Date"),
-            y=alt.Y("cumulative:Q", title="Cumulative Players"),
-            tooltip=["day:T", "new_players", "cumulative"]
-        ).properties(height=320, title="Cumulative Players Over Time")
-        chart_cols[1].altair_chart(ch2, use_container_width=True)
+        created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
+        if created_parsed.notna().any():
+            by_day = (
+                pd.DataFrame({"day": created_parsed.dt.date})
+                .dropna()
+                .groupby("day").size().reset_index(name="new_players")
+            )
+            by_day["cumulative"] = by_day["new_players"].cumsum()
+            ch2 = alt.Chart(by_day).mark_line(point=True).encode(
+                x=alt.X("day:T", title="Date"),
+                y=alt.Y("cumulative:Q", title="Cumulative Players"),
+                tooltip=["day:T", "new_players", "cumulative"]
+            ).properties(height=320, title="Cumulative Players Over Time")
+            chart_cols[1].altair_chart(ch2, use_container_width=True)
+        else:
+            chart_cols[1].write("No valid dates found in `createdAt` for time series.")
 
     # Country distribution
     if "country" in fdf.columns:
