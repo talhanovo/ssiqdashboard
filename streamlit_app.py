@@ -419,10 +419,8 @@ if not df.empty:
         if "usd_spent_total" in fdf.columns:
             dens = fdf[["usd_spent_total"]].dropna()
             if not dens.empty:
-                ch4 = alt.Chart(dens).transform_bin(
-                    ["usd_spent_total"], bin=alt.Bin(maxbins=40)
-                ).mark_bar().encode(
-                    x=alt.X("usd_spent_total:Q", title="USD Spent (Total)"),
+                ch4 = alt.Chart(dens).mark_bar().encode(
+                    x=alt.X("usd_spent_total:Q", bin=alt.Bin(maxbins=40), title="USD Spent (Total)"),
                     y=alt.Y("count():Q", title="Players"),
                     tooltip=["count()"]
                 ).properties(height=320, title="Distribution: USD Spent")
@@ -432,14 +430,12 @@ if not df.empty:
         if ratio_col in fdf.columns:
             densr = fdf[[ratio_col]].dropna()
             if not densr.empty:
-                ch5 = alt.Chart(densr).transform_bin(
-                    [ratio_col], bin=alt.Bin(maxbins=40)
-                ).mark_bar().encode(
-                    x=alt.X(f"{ratio_col}:Q", title="Won/Spent Ratio (ROI×)"),
-                    y=alt.Y("count():Q", title="Players"),
-                    tooltip=["count()"]
-                ).properties(height=320, title="Distribution: ROI (Won/Spent)")
-                fin_cols[1].altair_chart(ch5, use_container_width=True)
+                ch5 = alt.Chart(densr).mark_bar().encode(
+                x=alt.X(f"{ratio_col}:Q", bin=alt.Bin(maxbins=40), title="Won/Spent Ratio (ROI×)"),
+                y=alt.Y("count():Q", title="Players"),
+                tooltip=["count()"]
+            ).properties(height=320, title="Distribution: ROI (Won/Spent)")
+            fin_cols[1].altair_chart(ch5, use_container_width=True)
 
     st.markdown("---")
 
