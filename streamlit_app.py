@@ -153,7 +153,9 @@ def enrich(df: pd.DataFrame) -> pd.DataFrame:
     # contest list count (rough) from the free text column if present
     if "contests_participated" in df.columns:
         df["contests_list_count"] = (
-            df["contests_participated"].fillna("").astype(str).apply(lambda s: 0 if s.strip()=="" else len([x for x in re.split(r",\s*", s) if x]))
+            df["contests_participated"].fillna("").astype(str).apply(
+                lambda s: 0 if s.strip()=="" else len([x for x in re.split(r",\s*", s) if x])
+            )
         )
 
     # Compute ratios if missing
@@ -173,7 +175,9 @@ def enrich(df: pd.DataFrame) -> pd.DataFrame:
     df["is_banned"] = df.apply(is_banned, axis=1)
 
     # Status simplified
-    df["status_simple"] = df.get("status", "").astype(str).str.title().replace({"On-Boarded": "Onboarded", "On-Boarding": "Onboarding"})
+    df["status_simple"] = df.get("status", "").astype(str).str.title().replace(
+        {"On-Boarded": "Onboarded", "On-Boarding": "Onboarding"}
+    )
 
     # Days since created (for freshness filters)
     if "createdAt" in df.columns:
@@ -221,7 +225,10 @@ load_error: Optional[str] = None
 if load_btn and sheet_url_or_id:
     try:
         if mode.startswith("CSV"):
-            df = load_from_csv_export(sheet_url_or_id + f"?cache_bust={st.session_state._cache_bust}", worksheet_name or None)
+            df = load_from_csv_export(
+                sheet_url_or_id + f"?cache_bust={st.session_state._cache_bust}",
+                worksheet_name or None
+            )
         else:
             sid = _extract_sheet_id(sheet_url_or_id) or sheet_url_or_id
             if not worksheet_name:
@@ -324,6 +331,16 @@ if not df.empty:
         if text_cols:
             fdf = fdf[fdf[text_cols].astype(str).apply(lambda row: any(qq in str(v).lower() for v in row), axis=1)]
 
+    # ------- Hard filters (your request) -------
+    # 1) Exclude emails containing "test" (case-insensitive)
+    if "email" in fdf.columns:
+        fdf = fdf[~fdf["email"].astype(str).str.contains(r"test", case=False, na=False)]
+
+    # 2) Only include users where country == "United States" (case-insensitive)
+    if "country" in fdf.columns:
+        fdf = fdf[fdf["country"].astype(str).str.strip().str.lower() == "united states"]
+    # -------------------------------------------
+
     # -----------------------------
     # KPIs
     # -----------------------------
@@ -332,7 +349,6 @@ if not df.empty:
     onboarding = int((fdf.get("status_simple", "") == "Onboarding").sum()) if "status_simple" in fdf.columns else 0
     banned = int(fdf.get("is_banned", pd.Series([False]*len(fdf))).sum())
 
-    usd_cols_present = [c for c in ["usd_spent_total", "usd_won_total", "usd_deposit_total", "usd_net_total", "usd_wallet_balance"] if c in fdf.columns]
     usd_spent = float(fdf.get("usd_spent_total", 0).fillna(0).sum())
     usd_won = float(fdf.get("usd_won_total", 0).fillna(0).sum())
     usd_deposit = float(fdf.get("usd_deposit_total", 0).fillna(0).sum())
@@ -431,11 +447,11 @@ if not df.empty:
             densr = fdf[[ratio_col]].dropna()
             if not densr.empty:
                 ch5 = alt.Chart(densr).mark_bar().encode(
-                x=alt.X(f"{ratio_col}:Q", bin=alt.Bin(maxbins=40), title="Won/Spent Ratio (ROI×)"),
-                y=alt.Y("count():Q", title="Players"),
-                tooltip=["count()"]
-            ).properties(height=320, title="Distribution: ROI (Won/Spent)")
-            fin_cols[1].altair_chart(ch5, use_container_width=True)
+                    x=alt.X(f"{ratio_col}:Q", bin=alt.Bin(maxbins=40), title="Won/Spent Ratio (ROI×)"),
+                    y=alt.Y("count():Q", title="Players"),
+                    tooltip=["count()"]
+                ).properties(height=320, title="Distribution: ROI (Won/Spent)")
+                fin_cols[1].altair_chart(ch5, use_container_width=True)
 
     st.markdown("---")
 
@@ -452,7 +468,10 @@ if not df.empty:
     ]
     table_cols = [c for c in show_cols_default if c in fdf.columns]
     st.dataframe(
-        fdf[table_cols].sort_values(by=[c for c in ["usd_spent_total", "usd_won_total", "createdAt"] if c in table_cols], ascending=[False, False, True]).reset_index(drop=True),
+        fdf[table_cols].sort_values(
+            by=[c for c in ["usd_spent_total", "usd_won_total", "createdAt"] if c in table_cols],
+            ascending=[False, False, True]
+        ).reset_index(drop=True),
         use_container_width=True,
         hide_index=True,
     )
