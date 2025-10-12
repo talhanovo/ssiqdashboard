@@ -240,6 +240,8 @@ if load_btn and sheet_url_or_id:
 
 st.title("📊 Player Analytics Dashboard")
 
+tab_main, tab_beta = st.tabs(["All Users", "Beta Testing"])
+
 with st.expander("How to connect to your sheet", expanded=not load_btn):
     st.markdown(
         """
@@ -260,470 +262,566 @@ if load_error:
 
 if df.empty and load_btn:
     st.warning("No data loaded. Double-check the URL/ID and the worksheet name or sharing settings.")
-
-if not df.empty:
-    # -----------------------------
-    # Sidebar filters
-    # -----------------------------
-    st.sidebar.header("🔎 Filters")
-
-    # Date range filter (createdAt) — robust to mixed types/empty strings/NaN
-    if "createdAt" in df.columns:
-        created_series = pd.to_datetime(df["createdAt"], errors="coerce")
-        if created_series.notna().any():
-            min_date = created_series.min()
-            max_date = created_series.max()
-            # Coerce to date for widget (avoid min/max on mixed dtypes)
-            start_date_default = min_date.date()
-            end_date_default = max_date.date()
-            start_date, end_date = st.sidebar.date_input(
-                "Created date range",
-                value=(start_date_default, end_date_default),
-                min_value=start_date_default,
-                max_value=end_date_default,
-            )
+with tab_main:
+    if not df.empty:
+        # -----------------------------
+        # Sidebar filters
+        # -----------------------------
+        st.sidebar.header("🔎 Filters")
+    
+        # Date range filter (createdAt) — robust to mixed types/empty strings/NaN
+        if "createdAt" in df.columns:
+            created_series = pd.to_datetime(df["createdAt"], errors="coerce")
+            if created_series.notna().any():
+                min_date = created_series.min()
+                max_date = created_series.max()
+                # Coerce to date for widget (avoid min/max on mixed dtypes)
+                start_date_default = min_date.date()
+                end_date_default = max_date.date()
+                start_date, end_date = st.sidebar.date_input(
+                    "Created date range",
+                    value=(start_date_default, end_date_default),
+                    min_value=start_date_default,
+                    max_value=end_date_default,
+                )
+            else:
+                start_date, end_date = None, None
         else:
             start_date, end_date = None, None
-    else:
-        start_date, end_date = None, None
-
-    # Status filter
-    statuses = sorted(df["status_simple"].dropna().unique().tolist()) if "status_simple" in df.columns else []
-    status_sel = st.sidebar.multiselect("Status", statuses, default=statuses)
-
-    # Country filter
-    countries = sorted(df["country"].dropna().unique().tolist()) if "country" in df.columns else []
-    country_sel = st.sidebar.multiselect("Country", countries, default=countries)
-
-    # Quick search
-    quick_q = st.sidebar.text_input("Quick search (username, email, name, referral)")
-
-    # Minimum contests
-    min_contests = st.sidebar.number_input("Min contests count (total)", min_value=0, value=0, step=1)
-
-    # Apply filters
-    fdf = df.copy()
-
-    # Date filter
-    if start_date and end_date and "createdAt" in fdf.columns:
-        created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
-        left = pd.to_datetime(start_date)
-        right = pd.to_datetime(end_date) + pd.Timedelta(days=1)  # inclusive end
-        mask_date = created_parsed.between(left, right, inclusive="left").fillna(False)
-        fdf = fdf[mask_date]
-
-    # Status filter
-    if status_sel and "status_simple" in fdf.columns:
-        fdf = fdf[fdf["status_simple"].isin(status_sel)]
-
-    # Country filter
-    if country_sel and "country" in fdf.columns:
-        fdf = fdf[fdf["country"].isin(country_sel)]
-
-    # Min contests
-    if "contests_count_total" in fdf.columns:
-        fdf = fdf[fdf["contests_count_total"].fillna(0) >= min_contests]
-
-    # Quick search across text fields
-    if quick_q:
-        qq = quick_q.lower().strip()
-        text_cols = [c for c in TEXT_SEARCH_COLS if c in fdf.columns]
-        if text_cols:
-            fdf = fdf[fdf[text_cols].astype(str).apply(lambda row: any(qq in str(v).lower() for v in row), axis=1)]
-
-    # ------- Hard filters (expanded email exclusions + US-only) -------
-    if "email" in fdf.columns:
-        # Remove any email containing these keywords (case-insensitive)
+    
+        # Status filter
+        statuses = sorted(df["status_simple"].dropna().unique().tolist()) if "status_simple" in df.columns else []
+        status_sel = st.sidebar.multiselect("Status", statuses, default=statuses)
+    
+        # Country filter
+        countries = sorted(df["country"].dropna().unique().tolist()) if "country" in df.columns else []
+        country_sel = st.sidebar.multiselect("Country", countries, default=countries)
+    
+        # Quick search
+        quick_q = st.sidebar.text_input("Quick search (username, email, name, referral)")
+    
+        # Minimum contests
+        min_contests = st.sidebar.number_input("Min contests count (total)", min_value=0, value=0, step=1)
+    
+        # Apply filters
+        fdf = df.copy()
+    
+        # Date filter
+        if start_date and end_date and "createdAt" in fdf.columns:
+            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
+            left = pd.to_datetime(start_date)
+            right = pd.to_datetime(end_date) + pd.Timedelta(days=1)  # inclusive end
+            mask_date = created_parsed.between(left, right, inclusive="left").fillna(False)
+            fdf = fdf[mask_date]
+    
+        # Status filter
+        if status_sel and "status_simple" in fdf.columns:
+            fdf = fdf[fdf["status_simple"].isin(status_sel)]
+    
+        # Country filter
+        if country_sel and "country" in fdf.columns:
+            fdf = fdf[fdf["country"].isin(country_sel)]
+    
+        # Min contests
+        if "contests_count_total" in fdf.columns:
+            fdf = fdf[fdf["contests_count_total"].fillna(0) >= min_contests]
+    
+        # Quick search across text fields
+        if quick_q:
+            qq = quick_q.lower().strip()
+            text_cols = [c for c in TEXT_SEARCH_COLS if c in fdf.columns]
+            if text_cols:
+                fdf = fdf[fdf[text_cols].astype(str).apply(lambda row: any(qq in str(v).lower() for v in row), axis=1)]
+    
+        # ------- Hard filters (expanded email exclusions + US-only) -------
+        if "email" in fdf.columns:
+            # Remove any email containing these keywords (case-insensitive)
+            exclude_keywords = ["test", "prod", "yopmail", "rawleigh"]
+            pattern = "|".join(exclude_keywords)
+            fdf = fdf[~fdf["email"].astype(str).str.contains(pattern, case=False, na=False)]
+    
+        # Only include users where country == "United States" (case-insensitive)
+        if "country" in fdf.columns:
+            fdf = fdf[fdf["country"].astype(str).str.strip().str.lower() == "united states"]
+    
+    
+        # -----------------------------
+        # Key Metrics
+        # -----------------------------
+        st.subheader("Key Metrics")
+        
+        # Total players and verification summary
+        total_players = len(fdf)
+        
+        # Normalize profile_status safely
+        if "profile_status" in fdf.columns:
+            ps_norm = (
+                fdf["profile_status"]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+        else:
+            ps_norm = pd.Series([], dtype="object")
+        
+        # Buckets
+        unverified_set = {"unverified", "unverified np", "unverified p"}  # Only pure unverified
+        kyc_set = {"grade-i", "grade-ii", "grade-iii"}
+        
+        unverified_count = int(ps_norm.isin(unverified_set).sum()) if not ps_norm.empty else 0
+        kyc_verified_count = int(ps_norm.isin(kyc_set).sum()) if not ps_norm.empty else 0
+        
+        # Robust banned count
+        banned_count = 0
+        if not ps_norm.empty:
+            banned_count = int(ps_norm.str.contains(r"\bbanned\b", na=False).sum())
+        if banned_count == 0 and "is_banned" in fdf.columns:
+            banned_count = int(fdf["is_banned"].fillna(False).astype(bool).sum())
+        
+        # --- TOTAL USD METRICS ---
+        usd_spent = float(fdf.get("usd_spent_total", 0).fillna(0).sum())
+        usd_won = float(fdf.get("usd_won_total", 0).fillna(0).sum())
+        usd_deposit = float(fdf.get("usd_deposit_total", 0).fillna(0).sum())
+        usd_net = float(fdf.get("usd_net_total", 0).fillna(0).sum())
+        usd_wallet = float(fdf.get("usd_wallet_balance", 0).fillna(0).sum())
+        usd_withdraw = float(fdf.get("usd_withdraw_net_total", 0).fillna(0).sum())
+        
+        # --- LAST 14 DAYS METRICS ---
+        cutoff_14d = pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(days=14)
+        recent_df = fdf.copy()
+        if "createdAt" in recent_df.columns:
+            created_parsed = pd.to_datetime(recent_df["createdAt"], errors="coerce")
+            recent_df = recent_df[created_parsed >= cutoff_14d]
+        
+        usd_spent_14d = float(recent_df.get("usd_spent_total", 0).fillna(0).sum())
+        usd_won_14d = float(recent_df.get("usd_won_total", 0).fillna(0).sum())
+        usd_deposit_14d = float(recent_df.get("usd_deposit_total", 0).fillna(0).sum())
+        usd_net_14d = float(recent_df.get("usd_net_total", 0).fillna(0).sum())
+        usd_withdraw_14d = float(recent_df.get("usd_withdraw_net_total", 0).fillna(0).sum())
+        
+        # --- ROW 1: General User Metrics ---
+        kpi_row1 = st.columns(4)
+        kpi_row1[0].metric("Players", f"{total_players:,}")
+        kpi_row1[1].metric("Unverified", f"{unverified_count:,}")
+        kpi_row1[2].metric("KYC Verified", f"{kyc_verified_count:,}")
+        kpi_row1[3].metric("Banned", f"{banned_count:,}")
+        
+        # --- ROW 2: USD Totals (All-Time) ---
+        st.markdown("#### 💵 All-Time USD Metrics")
+        usd_row = st.columns(6)
+        usd_row[0].metric("USD Deposits ($)", f"${usd_deposit:,.0f}")
+        usd_row[1].metric("USD Withdrawals ($)", f"${usd_withdraw:,.0f}")
+        usd_row[2].metric("USD Spent ($)", f"${usd_spent:,.0f}")
+        usd_row[3].metric("USD Won ($)", f"${usd_won:,.0f}")
+        usd_row[4].metric("USD Net ($)", f"${usd_net:,.0f}")
+        usd_row[5].metric("USD in Wallets ($)", f"${usd_wallet:,.0f}")
+        
+        # ROI Metric under USD rows
+        if usd_spent > 0:
+            roi = usd_won / usd_spent
+            st.metric("Pooled ROI (won/spent)", f"{roi:,.2f}×")
+        else:
+            st.metric("Pooled ROI (won/spent)", "–")
+        
+        st.markdown("---")
+        # --- ROW 3: USD (Last 14 Days) ---
+        st.markdown("#### 📅 Last 14 Days USD Metrics")
+        usd_14d_row = st.columns(5)
+        usd_14d_row[0].metric("USD Deposits (14d)", f"${usd_deposit_14d:,.0f}")
+        usd_14d_row[1].metric("USD Withdrawals (14d)", f"${usd_withdraw_14d:,.0f}")
+        usd_14d_row[2].metric("USD Spent (14d)", f"${usd_spent_14d:,.0f}")
+        usd_14d_row[3].metric("USD Won (14d)", f"${usd_won_14d:,.0f}")
+        usd_14d_row[4].metric("USD Net (14d)", f"${usd_net_14d:,.0f}")
+        
+    
+    
+        # -----------------------------
+        # Charts
+        # -----------------------------
+        chart_cols = st.columns(2)
+    
+        # Players by Status
+        if "status_simple" in fdf.columns:
+            status_counts = (
+                fdf.groupby("status_simple").size().reset_index(name="count")
+            )
+            ch1 = alt.Chart(status_counts).mark_bar().encode(
+                x=alt.X("status_simple:N", title="Status"),
+                y=alt.Y("count:Q", title="Players"),
+                tooltip=["status_simple", "count"]
+            ).properties(height=320, title="Players by Status")
+            chart_cols[0].altair_chart(ch1, use_container_width=True)
+    
+        # New Players by Month & Last 14 Days
+        if "createdAt" in fdf.columns:
+            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
+            if created_parsed.notna().any():
+                # ---- Monthly new players ----
+                monthly = (
+                    pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
+                    .dropna()
+                    .groupby("month").size().reset_index(name="new_players")
+                    .sort_values("month")
+                )
+        
+                ch_month = alt.Chart(monthly).mark_bar().encode(
+                    x=alt.X("month:T", title="Month"),
+                    y=alt.Y("new_players:Q", title="New players"),
+                    tooltip=[
+                        alt.Tooltip("month:T", title="Month"),
+                        alt.Tooltip("new_players:Q", title="New players")
+                    ]
+                ).properties(height=320, title="New Players by Month")
+        
+                    # ---- New players in last 14 days (tz-safe, line chart) ----
+            now_naive = pd.Timestamp.utcnow().tz_localize(None)
+            cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
+            
+            recent_mask = created_parsed >= cutoff_date
+            recent = created_parsed[recent_mask]
+            
+            if recent.notna().any():
+                recent_by_day = (
+                    pd.DataFrame({"day": recent.dt.floor("D")})
+                    .groupby("day").size().reset_index(name="new_players")
+                    .sort_values("day")
+                )
+            
+                ch_recent = (
+                    alt.Chart(recent_by_day)
+                    .mark_line(point=True)
+                    .encode(
+                        x=alt.X("day:T", title="Date"),
+                        y=alt.Y("new_players:Q", title="New players"),
+                        tooltip=[
+                            alt.Tooltip("day:T", title="Date"),
+                            alt.Tooltip("new_players:Q", title="New players"),
+                        ],
+                    )
+                    .properties(height=320, title="New Players (Last 14 Days)")
+                )
+            
+                chart_cols = st.columns(2)
+                chart_cols[0].altair_chart(ch_month, use_container_width=True)
+                chart_cols[1].altair_chart(ch_recent, use_container_width=True)
+            else:
+                chart_cols = st.columns(2)
+                chart_cols[0].altair_chart(ch_month, use_container_width=True)
+                chart_cols[1].write("No new players in the last 14 days.")
+    
+        # State distribution (US-only view)
+        if "state" in fdf.columns:
+            st.markdown("### Geography (States)")
+    
+            # Clean up state values a bit
+            state_series = (
+                fdf["state"]
+                .astype(str)
+                .str.strip()
+                .replace({"": np.nan, "nan": np.nan, "None": np.nan})
+            )
+    
+            top_states = (
+                state_series.dropna()
+                .to_frame("state")
+                .groupby("state").size()
+                .reset_index(name="players")
+                .sort_values("players", ascending=False)
+            )
+    
+            if not top_states.empty:
+                ch_state = alt.Chart(top_states).mark_bar().encode(
+                    x=alt.X("players:Q", title="Players"),
+                    y=alt.Y("state:N", sort='-x', title="State"),
+                    tooltip=["state", "players"]
+                ).properties(height=380, title="Players by State")
+                st.altair_chart(ch_state, use_container_width=True)
+            else:
+                st.info("No state data available to display.")
+    
+        # Finance distributions
+        if any(col in fdf.columns for col in ["usd_spent_total", "usd_won_total", "computed_usd_won_to_spent_ratio", "usd_won_to_spent_ratio"]):
+            st.markdown("### Finance Distributions")
+            fin_cols = st.columns(2)
+    
+            if "usd_spent_total" in fdf.columns:
+                dens = fdf[["usd_spent_total"]].dropna()
+                if not dens.empty:
+                    ch4 = alt.Chart(dens).mark_bar().encode(
+                        x=alt.X("usd_spent_total:Q", bin=alt.Bin(maxbins=40), title="USD Spent (Total)"),
+                        y=alt.Y("count():Q", title="Players"),
+                        tooltip=["count()"]
+                    ).properties(height=320, title="Distribution: USD Spent")
+                    fin_cols[0].altair_chart(ch4, use_container_width=True)
+    
+            ratio_col = "usd_won_to_spent_ratio" if "usd_won_to_spent_ratio" in fdf.columns else "computed_usd_won_to_spent_ratio"
+            if ratio_col in fdf.columns:
+                densr = fdf[[ratio_col]].dropna()
+                if not densr.empty:
+                    ch5 = alt.Chart(densr).mark_bar().encode(
+                        x=alt.X(f"{ratio_col}:Q", bin=alt.Bin(maxbins=40), title="Won/Spent Ratio (ROI×)"),
+                        y=alt.Y("count():Q", title="Players"),
+                        tooltip=["count()"]
+                    ).properties(height=320, title="Distribution: ROI (Won/Spent)")
+                    fin_cols[1].altair_chart(ch5, use_container_width=True)
+    
+        st.markdown("---")
+        # -----------------------------
+        # Players Table
+        # -----------------------------
+        st.markdown("### Players (filtered)")
+        
+        # Only include these specific columns
+        show_cols_default = [
+            "username",
+            "name",
+            "contests_count_total",
+            "lineups_count_total",
+            "contests_participated",
+            "referral_code",
+            "referral_count",
+            "usd_wallet_balance",
+            "usd_spent_total",
+            "usd_won_total",
+            "usd_deposit_total",
+            "usd_withdraw_net_total",
+        ]
+        
+        # Keep only columns that actually exist in the dataset
+        table_cols = [c for c in show_cols_default if c in fdf.columns]
+        
+        # Sort only by keys that are present in the *displayed* columns
+        preferred_sort_order = ["usd_spent_total", "usd_won_total"]  # drop "createdAt"
+        sort_keys = [c for c in preferred_sort_order if c in table_cols]
+        
+        df_display = fdf[table_cols].copy()
+        if sort_keys:
+            df_display = df_display.sort_values(
+                by=sort_keys,
+                ascending=[False] * len(sort_keys)
+            )
+        
+        st.dataframe(
+            df_display.reset_index(drop=True),
+            use_container_width=True,
+            hide_index=True,
+        )
+        
+        # CSV download for the filtered dataset
+        csv = df_display.to_csv(index=False).encode("utf-8")
+        st.download_button(
+        "Download filtered CSV",
+        csv,
+        file_name="players_filtered.csv",
+        mime="text/csv",
+        key="download_filtered_players"
+    )
+    
+    
+        # -----------------------------
+        # Dropped-off at Signup (Unverified ONLY)
+        # -----------------------------
+        st.markdown("### Users that dropped off at signup")
+        
+        # Choose data source to avoid accidentally hiding real unverified users
+        source_choice = st.radio(
+            "Show from:",
+            ["All data (ignore page filters)", "Use page filters"],
+            horizontal=True,
+            help="If unverified users are missing, they may have been filtered out earlier. "
+                 "Use 'All data' to ignore page filters for this list (but still exclude junk emails)."
+        )
+        
+        # Pick the frame: df = all cleaned data, fdf = filtered view
+        base_frame = df if source_choice.startswith("All data") else fdf
+        
+        # Always exclude junk emails per your rule
         exclude_keywords = ["test", "prod", "yopmail", "rawleigh"]
-        pattern = "|".join(exclude_keywords)
-        fdf = fdf[~fdf["email"].astype(str).str.contains(pattern, case=False, na=False)]
-
-    # Only include users where country == "United States" (case-insensitive)
-    if "country" in fdf.columns:
-        fdf = fdf[fdf["country"].astype(str).str.strip().str.lower() == "united states"]
-
-
-    # -----------------------------
-    # Key Metrics
-    # -----------------------------
-    st.subheader("Key Metrics")
-    
-    # Total players and verification summary
-    total_players = len(fdf)
-    
-    # Normalize profile_status safely
-    if "profile_status" in fdf.columns:
-        ps_norm = (
-            fdf["profile_status"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
+        email_pattern = "|".join(exclude_keywords)
+        if "email" in base_frame.columns:
+            base_frame = base_frame[~base_frame["email"].astype(str).str.contains(email_pattern, case=False, na=False)]
+        
+        # Prefer 'player_status' then fall back to 'profile_status'
+        status_source_col = (
+            "player_status" if "player_status" in base_frame.columns
+            else ("profile_status" if "profile_status" in base_frame.columns else None)
         )
+        
+        if status_source_col is None:
+            st.info("No player/profile status column found.")
+        else:
+            ps_norm = (
+                base_frame[status_source_col]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+            )
+        
+            # EXACTLY "unverified" (not "unverified np" or "unverified p")
+            mask_unverified_exact = ps_norm.eq("unverified")
+        
+            dropped = (
+                base_frame.loc[mask_unverified_exact, [c for c in ["username", "email"] if c in base_frame.columns]]
+                .copy()
+            )
+        
+            # Small summary comparing against fully filtered view (optional)
+            summary_note = ""
+            if source_choice.startswith("All data") and status_source_col is not None:
+                # Count how many unverified remain after page filters too (fdf)
+                if not fdf.empty and status_source_col in fdf.columns:
+                    ps_f = fdf[status_source_col].astype(str).str.strip().str.lower()
+                    filtered_count = int(ps_f.eq("unverified").sum())
+                    summary_note = f" (Visible with page filters: **{filtered_count:,}**)"
+            
+            if dropped.empty:
+                st.info("No users with status exactly 'unverified' found." + summary_note)
+            else:
+                st.caption(f"Found **{len(dropped):,}** unverified user(s){summary_note}.")
+                dropped["tag"] = "Users that dropped off at signup"
+                st.dataframe(dropped, use_container_width=True, hide_index=True)
+        
+                # CSV download
+                st.download_button(
+                    "Download dropped-off users CSV",
+                    dropped.to_csv(index=False).encode("utf-8"),
+                    file_name="dropped_off_users.csv",
+                    mime="text/csv",
+                )
+    
+    
+        # CSV download for the filtered dataset
+        csv = fdf.to_csv(index=False).encode("utf-8")
+        st.download_button("Download filtered CSV", csv, file_name="players_filtered.csv", mime="text/csv")
+    
+        # -----------------------------
+        # Data Quality Checks
+        # -----------------------------
+        st.markdown("---")
+        st.markdown("### Data Quality Checks")
+        dq_msgs: List[str] = []
+    
+        # Missing key fields
+        for key_col in ["_id", "email", "username"]:
+            if key_col in fdf.columns:
+                missing = int(fdf[key_col].isna().sum() + (fdf[key_col].astype(str).str.strip()=="").sum())
+                if missing:
+                    dq_msgs.append(f"• {missing} rows missing `{key_col}`")
+    
+        # Date issues
+        for dcol in ["createdAt", "updatedAt"]:
+            if dcol in fdf.columns:
+                bad = int(fdf[dcol].isna().sum())
+                if bad:
+                    dq_msgs.append(f"• {bad} rows with invalid `{dcol}`")
+    
+        # Ratio sanity (> 20× might be suspicious depending on your domain)
+        ratio_col = "usd_won_to_spent_ratio" if "usd_won_to_spent_ratio" in fdf.columns else "computed_usd_won_to_spent_ratio"
+        if ratio_col in fdf.columns:
+            extreme = int((fdf[ratio_col] > 20).sum())
+            if extreme:
+                dq_msgs.append(f"• {extreme} rows with very high ROI (>20×) — verify correctness")
+    
+        if dq_msgs:
+            st.warning("\n".join(dq_msgs))
+        else:
+            st.success("No major data quality warnings detected.")
+    
     else:
-        ps_norm = pd.Series([], dtype="object")
-    
-    # Buckets
-    unverified_set = {"unverified", "unverified np", "unverified p"}  # Only pure unverified
-    kyc_set = {"grade-i", "grade-ii", "grade-iii"}
-    
-    unverified_count = int(ps_norm.isin(unverified_set).sum()) if not ps_norm.empty else 0
-    kyc_verified_count = int(ps_norm.isin(kyc_set).sum()) if not ps_norm.empty else 0
-    
-    # Robust banned count
-    banned_count = 0
-    if not ps_norm.empty:
-        banned_count = int(ps_norm.str.contains(r"\bbanned\b", na=False).sum())
-    if banned_count == 0 and "is_banned" in fdf.columns:
-        banned_count = int(fdf["is_banned"].fillna(False).astype(bool).sum())
-    
-    # --- TOTAL USD METRICS ---
-    usd_spent = float(fdf.get("usd_spent_total", 0).fillna(0).sum())
-    usd_won = float(fdf.get("usd_won_total", 0).fillna(0).sum())
-    usd_deposit = float(fdf.get("usd_deposit_total", 0).fillna(0).sum())
-    usd_net = float(fdf.get("usd_net_total", 0).fillna(0).sum())
-    usd_wallet = float(fdf.get("usd_wallet_balance", 0).fillna(0).sum())
-    usd_withdraw = float(fdf.get("usd_withdraw_net_total", 0).fillna(0).sum())
-    
-    # --- LAST 14 DAYS METRICS ---
-    cutoff_14d = pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(days=14)
-    recent_df = fdf.copy()
-    if "createdAt" in recent_df.columns:
-        created_parsed = pd.to_datetime(recent_df["createdAt"], errors="coerce")
-        recent_df = recent_df[created_parsed >= cutoff_14d]
-    
-    usd_spent_14d = float(recent_df.get("usd_spent_total", 0).fillna(0).sum())
-    usd_won_14d = float(recent_df.get("usd_won_total", 0).fillna(0).sum())
-    usd_deposit_14d = float(recent_df.get("usd_deposit_total", 0).fillna(0).sum())
-    usd_net_14d = float(recent_df.get("usd_net_total", 0).fillna(0).sum())
-    usd_withdraw_14d = float(recent_df.get("usd_withdraw_net_total", 0).fillna(0).sum())
-    
-    # --- ROW 1: General User Metrics ---
-    kpi_row1 = st.columns(4)
-    kpi_row1[0].metric("Players", f"{total_players:,}")
-    kpi_row1[1].metric("Unverified", f"{unverified_count:,}")
-    kpi_row1[2].metric("KYC Verified", f"{kyc_verified_count:,}")
-    kpi_row1[3].metric("Banned", f"{banned_count:,}")
-    
-    # --- ROW 2: USD Totals (All-Time) ---
-    st.markdown("#### 💵 All-Time USD Metrics")
-    usd_row = st.columns(6)
-    usd_row[0].metric("USD Deposits ($)", f"${usd_deposit:,.0f}")
-    usd_row[1].metric("USD Withdrawals ($)", f"${usd_withdraw:,.0f}")
-    usd_row[2].metric("USD Spent ($)", f"${usd_spent:,.0f}")
-    usd_row[3].metric("USD Won ($)", f"${usd_won:,.0f}")
-    usd_row[4].metric("USD Net ($)", f"${usd_net:,.0f}")
-    usd_row[5].metric("USD in Wallets ($)", f"${usd_wallet:,.0f}")
-    
-    # ROI Metric under USD rows
-    if usd_spent > 0:
-        roi = usd_won / usd_spent
-        st.metric("Pooled ROI (won/spent)", f"{roi:,.2f}×")
+        st.info("Load your Google Sheet from the sidebar to get started.")
+
+
+with tab_beta:
+    st.subheader("🧪 Beta Testing Metrics")
+
+    # Filter users whose signupSource == 'betatesting'
+    beta_df = df[df["signupSource"].astype(str).str.lower() == "betatesting"].copy()
+
+    if beta_df.empty:
+        st.info("No users found with signupSource = 'betatesting'.")
     else:
-        st.metric("Pooled ROI (won/spent)", "–")
-    
-    st.markdown("---")
-    # --- ROW 3: USD (Last 14 Days) ---
-    st.markdown("#### 📅 Last 14 Days USD Metrics")
-    usd_14d_row = st.columns(5)
-    usd_14d_row[0].metric("USD Deposits (14d)", f"${usd_deposit_14d:,.0f}")
-    usd_14d_row[1].metric("USD Withdrawals (14d)", f"${usd_withdraw_14d:,.0f}")
-    usd_14d_row[2].metric("USD Spent (14d)", f"${usd_spent_14d:,.0f}")
-    usd_14d_row[3].metric("USD Won (14d)", f"${usd_won_14d:,.0f}")
-    usd_14d_row[4].metric("USD Net (14d)", f"${usd_net_14d:,.0f}")
-    
+        st.caption(f"Found **{len(beta_df):,}** beta testing user(s).")
 
+        # Reuse your metrics logic for this filtered DataFrame
+        fdf = beta_df  # Reuse naming for simplicity
 
-    # -----------------------------
-    # Charts
-    # -----------------------------
-    chart_cols = st.columns(2)
+        # --- (Reuse your Key Metrics Section here) ---
+        # You can literally copy the same “Key Metrics” block you already have, 
+        # but replace all references to the main fdf with this one.
+        
+        # Example:
+        total_players = len(fdf)
+        ps_norm = fdf["profile_status"].astype(str).str.strip().str.lower() if "profile_status" in fdf.columns else pd.Series([], dtype="object")
 
-    # Players by Status
-    if "status_simple" in fdf.columns:
-        status_counts = (
-            fdf.groupby("status_simple").size().reset_index(name="count")
-        )
-        ch1 = alt.Chart(status_counts).mark_bar().encode(
-            x=alt.X("status_simple:N", title="Status"),
-            y=alt.Y("count:Q", title="Players"),
-            tooltip=["status_simple", "count"]
-        ).properties(height=320, title="Players by Status")
-        chart_cols[0].altair_chart(ch1, use_container_width=True)
+        unverified_set = {"unverified"}
+        kyc_set = {"grade-i", "grade-ii", "grade-iii"}
 
-    # New Players by Month & Last 14 Days
-    if "createdAt" in fdf.columns:
-        created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
-        if created_parsed.notna().any():
-            # ---- Monthly new players ----
+        unverified_count = int(ps_norm.isin(unverified_set).sum())
+        kyc_verified_count = int(ps_norm.isin(kyc_set).sum())
+        banned_count = int(ps_norm.str.contains("banned", na=False).sum())
+
+        usd_spent = fdf["usd_spent_total"].fillna(0).sum()
+        usd_won = fdf["usd_won_total"].fillna(0).sum()
+        usd_deposit = fdf["usd_deposit_total"].fillna(0).sum()
+        usd_withdraw = fdf["usd_withdraw_net_total"].fillna(0).sum()
+        usd_net = fdf["usd_net_total"].fillna(0).sum()
+        usd_wallet = fdf["usd_wallet_balance"].fillna(0).sum()
+
+        st.markdown("#### 💵 Beta Users — All-Time USD Metrics")
+        cols = st.columns(6)
+        cols[0].metric("USD Deposits ($)", f"${usd_deposit:,.0f}")
+        cols[1].metric("USD Withdrawals ($)", f"${usd_withdraw:,.0f}")
+        cols[2].metric("USD Spent ($)", f"${usd_spent:,.0f}")
+        cols[3].metric("USD Won ($)", f"${usd_won:,.0f}")
+        cols[4].metric("USD Net ($)", f"${usd_net:,.0f}")
+        cols[5].metric("USD in Wallets ($)", f"${usd_wallet:,.0f}")
+
+        # ROI metric
+        if usd_spent > 0:
+            st.metric("Pooled ROI (won/spent)", f"{usd_won / usd_spent:,.2f}×")
+        else:
+            st.metric("Pooled ROI (won/spent)", "–")
+
+        st.markdown("---")
+
+        # Charts reuse (Monthly + 14d)
+        if "createdAt" in fdf.columns:
+            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
             monthly = (
                 pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
                 .dropna()
                 .groupby("month").size().reset_index(name="new_players")
                 .sort_values("month")
             )
-    
+
             ch_month = alt.Chart(monthly).mark_bar().encode(
                 x=alt.X("month:T", title="Month"),
                 y=alt.Y("new_players:Q", title="New players"),
-                tooltip=[
-                    alt.Tooltip("month:T", title="Month"),
-                    alt.Tooltip("new_players:Q", title="New players")
-                ]
-            ).properties(height=320, title="New Players by Month")
-    
-                # ---- New players in last 14 days (tz-safe, line chart) ----
-        now_naive = pd.Timestamp.utcnow().tz_localize(None)
-        cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
-        
-        recent_mask = created_parsed >= cutoff_date
-        recent = created_parsed[recent_mask]
-        
-        if recent.notna().any():
-            recent_by_day = (
-                pd.DataFrame({"day": recent.dt.floor("D")})
-                .groupby("day").size().reset_index(name="new_players")
-                .sort_values("day")
-            )
-        
-            ch_recent = (
-                alt.Chart(recent_by_day)
-                .mark_line(point=True)
-                .encode(
-                    x=alt.X("day:T", title="Date"),
-                    y=alt.Y("new_players:Q", title="New players"),
-                    tooltip=[
-                        alt.Tooltip("day:T", title="Date"),
-                        alt.Tooltip("new_players:Q", title="New players"),
-                    ],
+            ).properties(height=300, title="New Beta Players by Month")
+
+            now_naive = pd.Timestamp.utcnow().tz_localize(None)
+            cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
+            recent_mask = created_parsed >= cutoff_date
+            recent = created_parsed[recent_mask]
+
+            if recent.notna().any():
+                recent_by_day = (
+                    pd.DataFrame({"day": recent.dt.floor("D")})
+                    .groupby("day").size().reset_index(name="new_players")
+                    .sort_values("day")
                 )
-                .properties(height=320, title="New Players (Last 14 Days)")
-            )
-        
-            chart_cols = st.columns(2)
-            chart_cols[0].altair_chart(ch_month, use_container_width=True)
-            chart_cols[1].altair_chart(ch_recent, use_container_width=True)
-        else:
-            chart_cols = st.columns(2)
-            chart_cols[0].altair_chart(ch_month, use_container_width=True)
-            chart_cols[1].write("No new players in the last 14 days.")
 
-    # State distribution (US-only view)
-    if "state" in fdf.columns:
-        st.markdown("### Geography (States)")
+                ch_recent = (
+                    alt.Chart(recent_by_day)
+                    .mark_line(point=True)
+                    .encode(
+                        x=alt.X("day:T", title="Date"),
+                        y=alt.Y("new_players:Q", title="New players"),
+                    )
+                    .properties(height=300, title="New Beta Players (Last 14 Days)")
+                )
 
-        # Clean up state values a bit
-        state_series = (
-            fdf["state"]
-            .astype(str)
-            .str.strip()
-            .replace({"": np.nan, "nan": np.nan, "None": np.nan})
-        )
+                ch_cols = st.columns(2)
+                ch_cols[0].altair_chart(ch_month, use_container_width=True)
+                ch_cols[1].altair_chart(ch_recent, use_container_width=True)
 
-        top_states = (
-            state_series.dropna()
-            .to_frame("state")
-            .groupby("state").size()
-            .reset_index(name="players")
-            .sort_values("players", ascending=False)
-        )
-
-        if not top_states.empty:
-            ch_state = alt.Chart(top_states).mark_bar().encode(
-                x=alt.X("players:Q", title="Players"),
-                y=alt.Y("state:N", sort='-x', title="State"),
-                tooltip=["state", "players"]
-            ).properties(height=380, title="Players by State")
-            st.altair_chart(ch_state, use_container_width=True)
-        else:
-            st.info("No state data available to display.")
-
-    # Finance distributions
-    if any(col in fdf.columns for col in ["usd_spent_total", "usd_won_total", "computed_usd_won_to_spent_ratio", "usd_won_to_spent_ratio"]):
-        st.markdown("### Finance Distributions")
-        fin_cols = st.columns(2)
-
-        if "usd_spent_total" in fdf.columns:
-            dens = fdf[["usd_spent_total"]].dropna()
-            if not dens.empty:
-                ch4 = alt.Chart(dens).mark_bar().encode(
-                    x=alt.X("usd_spent_total:Q", bin=alt.Bin(maxbins=40), title="USD Spent (Total)"),
-                    y=alt.Y("count():Q", title="Players"),
-                    tooltip=["count()"]
-                ).properties(height=320, title="Distribution: USD Spent")
-                fin_cols[0].altair_chart(ch4, use_container_width=True)
-
-        ratio_col = "usd_won_to_spent_ratio" if "usd_won_to_spent_ratio" in fdf.columns else "computed_usd_won_to_spent_ratio"
-        if ratio_col in fdf.columns:
-            densr = fdf[[ratio_col]].dropna()
-            if not densr.empty:
-                ch5 = alt.Chart(densr).mark_bar().encode(
-                    x=alt.X(f"{ratio_col}:Q", bin=alt.Bin(maxbins=40), title="Won/Spent Ratio (ROI×)"),
-                    y=alt.Y("count():Q", title="Players"),
-                    tooltip=["count()"]
-                ).properties(height=320, title="Distribution: ROI (Won/Spent)")
-                fin_cols[1].altair_chart(ch5, use_container_width=True)
-
-    st.markdown("---")
-    # -----------------------------
-    # Players Table
-    # -----------------------------
-    st.markdown("### Players (filtered)")
-    
-    # Only include these specific columns
-    show_cols_default = [
-        "username",
-        "name",
-        "contests_count_total",
-        "lineups_count_total",
-        "contests_participated",
-        "referral_code",
-        "referral_count",
-        "usd_wallet_balance",
-        "usd_spent_total",
-        "usd_won_total",
-        "usd_deposit_total",
-        "usd_withdraw_net_total",
-    ]
-    
-    # Keep only columns that actually exist in the dataset
-    table_cols = [c for c in show_cols_default if c in fdf.columns]
-    
-    # Sort only by keys that are present in the *displayed* columns
-    preferred_sort_order = ["usd_spent_total", "usd_won_total"]  # drop "createdAt"
-    sort_keys = [c for c in preferred_sort_order if c in table_cols]
-    
-    df_display = fdf[table_cols].copy()
-    if sort_keys:
-        df_display = df_display.sort_values(
-            by=sort_keys,
-            ascending=[False] * len(sort_keys)
-        )
-    
-    st.dataframe(
-        df_display.reset_index(drop=True),
-        use_container_width=True,
-        hide_index=True,
-    )
-    
-    # CSV download for the filtered dataset
-    csv = df_display.to_csv(index=False).encode("utf-8")
-    st.download_button(
-    "Download filtered CSV",
-    csv,
-    file_name="players_filtered.csv",
-    mime="text/csv",
-    key="download_filtered_players"
-)
-
-
-    # -----------------------------
-    # Dropped-off at Signup (Unverified ONLY)
-    # -----------------------------
-    st.markdown("### Users that dropped off at signup")
-    
-    # Choose data source to avoid accidentally hiding real unverified users
-    source_choice = st.radio(
-        "Show from:",
-        ["All data (ignore page filters)", "Use page filters"],
-        horizontal=True,
-        help="If unverified users are missing, they may have been filtered out earlier. "
-             "Use 'All data' to ignore page filters for this list (but still exclude junk emails)."
-    )
-    
-    # Pick the frame: df = all cleaned data, fdf = filtered view
-    base_frame = df if source_choice.startswith("All data") else fdf
-    
-    # Always exclude junk emails per your rule
-    exclude_keywords = ["test", "prod", "yopmail", "rawleigh"]
-    email_pattern = "|".join(exclude_keywords)
-    if "email" in base_frame.columns:
-        base_frame = base_frame[~base_frame["email"].astype(str).str.contains(email_pattern, case=False, na=False)]
-    
-    # Prefer 'player_status' then fall back to 'profile_status'
-    status_source_col = (
-        "player_status" if "player_status" in base_frame.columns
-        else ("profile_status" if "profile_status" in base_frame.columns else None)
-    )
-    
-    if status_source_col is None:
-        st.info("No player/profile status column found.")
-    else:
-        ps_norm = (
-            base_frame[status_source_col]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-        )
-    
-        # EXACTLY "unverified" (not "unverified np" or "unverified p")
-        mask_unverified_exact = ps_norm.eq("unverified")
-    
-        dropped = (
-            base_frame.loc[mask_unverified_exact, [c for c in ["username", "email"] if c in base_frame.columns]]
-            .copy()
-        )
-    
-        # Small summary comparing against fully filtered view (optional)
-        summary_note = ""
-        if source_choice.startswith("All data") and status_source_col is not None:
-            # Count how many unverified remain after page filters too (fdf)
-            if not fdf.empty and status_source_col in fdf.columns:
-                ps_f = fdf[status_source_col].astype(str).str.strip().str.lower()
-                filtered_count = int(ps_f.eq("unverified").sum())
-                summary_note = f" (Visible with page filters: **{filtered_count:,}**)"
-        
-        if dropped.empty:
-            st.info("No users with status exactly 'unverified' found." + summary_note)
-        else:
-            st.caption(f"Found **{len(dropped):,}** unverified user(s){summary_note}.")
-            dropped["tag"] = "Users that dropped off at signup"
-            st.dataframe(dropped, use_container_width=True, hide_index=True)
-    
-            # CSV download
-            st.download_button(
-                "Download dropped-off users CSV",
-                dropped.to_csv(index=False).encode("utf-8"),
-                file_name="dropped_off_users.csv",
-                mime="text/csv",
-            )
-
-
-    # CSV download for the filtered dataset
-    csv = fdf.to_csv(index=False).encode("utf-8")
-    st.download_button("Download filtered CSV", csv, file_name="players_filtered.csv", mime="text/csv")
-
-    # -----------------------------
-    # Data Quality Checks
-    # -----------------------------
-    st.markdown("---")
-    st.markdown("### Data Quality Checks")
-    dq_msgs: List[str] = []
-
-    # Missing key fields
-    for key_col in ["_id", "email", "username"]:
-        if key_col in fdf.columns:
-            missing = int(fdf[key_col].isna().sum() + (fdf[key_col].astype(str).str.strip()=="").sum())
-            if missing:
-                dq_msgs.append(f"• {missing} rows missing `{key_col}`")
-
-    # Date issues
-    for dcol in ["createdAt", "updatedAt"]:
-        if dcol in fdf.columns:
-            bad = int(fdf[dcol].isna().sum())
-            if bad:
-                dq_msgs.append(f"• {bad} rows with invalid `{dcol}`")
-
-    # Ratio sanity (> 20× might be suspicious depending on your domain)
-    ratio_col = "usd_won_to_spent_ratio" if "usd_won_to_spent_ratio" in fdf.columns else "computed_usd_won_to_spent_ratio"
-    if ratio_col in fdf.columns:
-        extreme = int((fdf[ratio_col] > 20).sum())
-        if extreme:
-            dq_msgs.append(f"• {extreme} rows with very high ROI (>20×) — verify correctness")
-
-    if dq_msgs:
-        st.warning("\n".join(dq_msgs))
-    else:
-        st.success("No major data quality warnings detected.")
-
-else:
-    st.info("Load your Google Sheet from the sidebar to get started.")
