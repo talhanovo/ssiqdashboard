@@ -606,11 +606,13 @@ if not df.empty:
     # CSV download for the filtered dataset
     csv = df_display.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "Download filtered CSV",
-        csv,
-        file_name="players_filtered.csv",
-        mime="text/csv",
-    )
+    "Download filtered CSV",
+    csv,
+    file_name="players_filtered.csv",
+    mime="text/csv",
+    key="download_filtered_players"
+)
+
 
     # -----------------------------
     # Dropped-off at Signup (Unverified ONLY)
