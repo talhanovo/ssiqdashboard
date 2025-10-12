@@ -341,34 +341,14 @@ if not df.empty:
     # Only include users where country == "United States" (case-insensitive)
     if "country" in fdf.columns:
         fdf = fdf[fdf["country"].astype(str).str.strip().str.lower() == "united states"]
-    # -------------------------------------------------------------------
+
 
     # -----------------------------
-    # Engagement Metrics (NEW)
+    # Key Metrics
     # -----------------------------
-    st.subheader("Engagement Metrics")
-    active_users = (
-        int(fdf["active_user"].astype(str).str.strip().str.lower().eq("yes").sum())
-        if "active_user" in fdf.columns else 0
-    )
-    activated_users = (
-        int(fdf["activated_user"].astype(str).str.strip().str.lower().eq("yes").sum())
-        if "activated_user" in fdf.columns else 0
-    )
-    demo_completed = (
-        int(fdf["demo_status"].astype(str).str.strip().str.lower().eq("completed").sum())
-        if "demo_status" in fdf.columns else 0
-    )
-    em_cols = st.columns(3)
-    em_cols[0].metric("Active Users", f"{active_users:,}")
-    em_cols[1].metric("Activated Users", f"{activated_users:,}")
-    em_cols[2].metric("Demo Completed", f"{demo_completed:,}")
-
-    st.markdown("---")
-
-    # -----------------------------
-    # KPIs
-    # -----------------------------
+    st.subheader("Key Metrics")
+    
+    # Total players and verification summary
     total_players = len(fdf)
     
     # Normalize profile_status safely
@@ -383,53 +363,75 @@ if not df.empty:
         ps_norm = pd.Series([], dtype="object")
     
     # Buckets
-    unverified_set = {"unverified", "unverified np", "unverified p"}
+    unverified_set = {"unverified"}  # Only pure unverified
     kyc_set = {"grade-i", "grade-ii", "grade-iii"}
     
     unverified_count = int(ps_norm.isin(unverified_set).sum()) if not ps_norm.empty else 0
     kyc_verified_count = int(ps_norm.isin(kyc_set).sum()) if not ps_norm.empty else 0
-    # ---- Robust banned count ----
+    
+    # Robust banned count
     banned_count = 0
     if not ps_norm.empty:
-        # match any variant that contains the word 'banned' (case-insensitive)
         banned_count = int(ps_norm.str.contains(r"\bbanned\b", na=False).sum())
+    if banned_count == 0 and "is_banned" in fdf.columns:
+        banned_count = int(fdf["is_banned"].fillna(False).astype(bool).sum())
     
-    # Fallbacks if profile_status is empty or has none
-    if banned_count == 0:
-        if "is_banned" in fdf.columns:
-            banned_count = int(fdf["is_banned"].fillna(False).astype(bool).sum())
-        elif "status" in fdf.columns:
-            banned_count = int(
-                fdf["status"].astype(str).str.strip().str.lower().str.contains(r"\bbanned\b", na=False).sum()
-            )
-    
-    # Finance sums
+    # --- TOTAL USD METRICS ---
     usd_spent = float(fdf.get("usd_spent_total", 0).fillna(0).sum())
     usd_won = float(fdf.get("usd_won_total", 0).fillna(0).sum())
     usd_deposit = float(fdf.get("usd_deposit_total", 0).fillna(0).sum())
     usd_net = float(fdf.get("usd_net_total", 0).fillna(0).sum())
     usd_wallet = float(fdf.get("usd_wallet_balance", 0).fillna(0).sum())
+    usd_withdraw = float(fdf.get("usd_withdraw_net_total", 0).fillna(0).sum())
     
-    st.subheader("Key Metrics")
-    kpi_cols = st.columns(6)
-    kpi_cols[0].metric("Players", f"{total_players:,}")
-    kpi_cols[1].metric("Unverified", f"{unverified_count:,}")
-    kpi_cols[2].metric("KYC Verified", f"{kyc_verified_count:,}")
-    kpi_cols[3].metric("Banned", f"{banned_count:,}")
-    kpi_cols[4].metric("USD Spent (Σ)", f"${usd_spent:,.0f}")
-    kpi_cols[5].metric("USD Won (Σ)", f"${usd_won:,.0f}")
+    # --- LAST 14 DAYS METRICS ---
+    cutoff_14d = pd.Timestamp.utcnow().tz_localize(None) - pd.Timedelta(days=14)
+    recent_df = fdf.copy()
+    if "createdAt" in recent_df.columns:
+        created_parsed = pd.to_datetime(recent_df["createdAt"], errors="coerce")
+        recent_df = recent_df[created_parsed >= cutoff_14d]
     
-    # Secondary KPIs row
-    kpi2 = st.columns(4)
-    kpi2[0].metric("USD Deposits (Σ)", f"${usd_deposit:,.0f}")
-    kpi2[1].metric("USD Net (Σ)", f"${usd_net:,.0f}")
-    kpi2[2].metric("USD Wallets (Σ)", f"${usd_wallet:,.0f}")
+    usd_spent_14d = float(recent_df.get("usd_spent_total", 0).fillna(0).sum())
+    usd_won_14d = float(recent_df.get("usd_won_total", 0).fillna(0).sum())
+    usd_deposit_14d = float(recent_df.get("usd_deposit_total", 0).fillna(0).sum())
+    usd_net_14d = float(recent_df.get("usd_net_total", 0).fillna(0).sum())
+    usd_withdraw_14d = float(recent_df.get("usd_withdraw_net_total", 0).fillna(0).sum())
+    
+    # --- ROW 1: General User Metrics ---
+    kpi_row1 = st.columns(4)
+    kpi_row1[0].metric("Players", f"{total_players:,}")
+    kpi_row1[1].metric("Unverified", f"{unverified_count:,}")
+    kpi_row1[2].metric("KYC Verified", f"{kyc_verified_count:,}")
+    kpi_row1[3].metric("Banned", f"{banned_count:,}")
+    
+    # --- ROW 2: USD Totals (All-Time) ---
+    st.markdown("#### 💵 All-Time USD Metrics")
+    usd_row = st.columns(6)
+    usd_row[0].metric("USD Deposits (Σ)", f"${usd_deposit:,.0f}")
+    usd_row[1].metric("USD Withdrawals (Σ)", f"${usd_withdraw:,.0f}")
+    usd_row[2].metric("USD Spent (Σ)", f"${usd_spent:,.0f}")
+    usd_row[3].metric("USD Won (Σ)", f"${usd_won:,.0f}")
+    usd_row[4].metric("USD Net (Σ)", f"${usd_net:,.0f}")
+    usd_row[5].metric("USD Wallets (Σ)", f"${usd_wallet:,.0f}")
+    
+    # --- ROW 3: USD (Last 14 Days) ---
+    st.markdown("#### 📅 Last 14 Days USD Metrics")
+    usd_14d_row = st.columns(5)
+    usd_14d_row[0].metric("USD Deposits (14d)", f"${usd_deposit_14d:,.0f}")
+    usd_14d_row[1].metric("USD Withdrawals (14d)", f"${usd_withdraw_14d:,.0f}")
+    usd_14d_row[2].metric("USD Spent (14d)", f"${usd_spent_14d:,.0f}")
+    usd_14d_row[3].metric("USD Won (14d)", f"${usd_won_14d:,.0f}")
+    usd_14d_row[4].metric("USD Net (14d)", f"${usd_net_14d:,.0f}")
+    
+    # ROI Metric under USD rows
     if usd_spent > 0:
-        kpi2[3].metric("Pooled ROI (won/spent)", f"{usd_won/usd_spent:,.2f}×")
+        roi = usd_won / usd_spent
+        st.metric("Pooled ROI (won/spent)", f"{roi:,.2f}×")
     else:
-        kpi2[3].metric("Pooled ROI (won/spent)", "–")
+        st.metric("Pooled ROI (won/spent)", "–")
     
     st.markdown("---")
+
 
     # -----------------------------
     # Charts
