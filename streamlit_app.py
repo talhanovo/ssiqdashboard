@@ -363,7 +363,7 @@ if not df.empty:
         ps_norm = pd.Series([], dtype="object")
     
     # Buckets
-    unverified_set = {"unverified"}  # Only pure unverified
+    unverified_set = {"unverified", "unverified np", "unverified p"}  # Only pure unverified
     kyc_set = {"grade-i", "grade-ii", "grade-iii"}
     
     unverified_count = int(ps_norm.isin(unverified_set).sum()) if not ps_norm.empty else 0
@@ -407,21 +407,12 @@ if not df.empty:
     # --- ROW 2: USD Totals (All-Time) ---
     st.markdown("#### 💵 All-Time USD Metrics")
     usd_row = st.columns(6)
-    usd_row[0].metric("USD Deposits (Σ)", f"${usd_deposit:,.0f}")
-    usd_row[1].metric("USD Withdrawals (Σ)", f"${usd_withdraw:,.0f}")
-    usd_row[2].metric("USD Spent (Σ)", f"${usd_spent:,.0f}")
-    usd_row[3].metric("USD Won (Σ)", f"${usd_won:,.0f}")
-    usd_row[4].metric("USD Net (Σ)", f"${usd_net:,.0f}")
-    usd_row[5].metric("USD Wallets (Σ)", f"${usd_wallet:,.0f}")
-    
-    # --- ROW 3: USD (Last 14 Days) ---
-    st.markdown("#### 📅 Last 14 Days USD Metrics")
-    usd_14d_row = st.columns(5)
-    usd_14d_row[0].metric("USD Deposits (14d)", f"${usd_deposit_14d:,.0f}")
-    usd_14d_row[1].metric("USD Withdrawals (14d)", f"${usd_withdraw_14d:,.0f}")
-    usd_14d_row[2].metric("USD Spent (14d)", f"${usd_spent_14d:,.0f}")
-    usd_14d_row[3].metric("USD Won (14d)", f"${usd_won_14d:,.0f}")
-    usd_14d_row[4].metric("USD Net (14d)", f"${usd_net_14d:,.0f}")
+    usd_row[0].metric("USD Deposits ($)", f"${usd_deposit:,.0f}")
+    usd_row[1].metric("USD Withdrawals ($)", f"${usd_withdraw:,.0f}")
+    usd_row[2].metric("USD Spent ($)", f"${usd_spent:,.0f}")
+    usd_row[3].metric("USD Won ($)", f"${usd_won:,.0f}")
+    usd_row[4].metric("USD Net ($)", f"${usd_net:,.0f}")
+    usd_row[5].metric("USD in Wallets ($)", f"${usd_wallet:,.0f}")
     
     # ROI Metric under USD rows
     if usd_spent > 0:
@@ -431,6 +422,15 @@ if not df.empty:
         st.metric("Pooled ROI (won/spent)", "–")
     
     st.markdown("---")
+    # --- ROW 3: USD (Last 14 Days) ---
+    st.markdown("#### 📅 Last 14 Days USD Metrics")
+    usd_14d_row = st.columns(5)
+    usd_14d_row[0].metric("USD Deposits (14d)", f"${usd_deposit_14d:,.0f}")
+    usd_14d_row[1].metric("USD Withdrawals (14d)", f"${usd_withdraw_14d:,.0f}")
+    usd_14d_row[2].metric("USD Spent (14d)", f"${usd_spent_14d:,.0f}")
+    usd_14d_row[3].metric("USD Won (14d)", f"${usd_won_14d:,.0f}")
+    usd_14d_row[4].metric("USD Net (14d)", f"${usd_net_14d:,.0f}")
+    
 
 
     # -----------------------------
