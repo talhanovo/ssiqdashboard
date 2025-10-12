@@ -469,34 +469,37 @@ if not df.empty:
                 ]
             ).properties(height=320, title="New Players by Month")
     
-            # ---- New players in last 14 days ----
-            cutoff_date = pd.Timestamp.utcnow().normalize() - pd.Timedelta(days=14)
-            recent = created_parsed[created_parsed >= cutoff_date]
-            if recent.notna().any():
-                recent_by_day = (
-                    pd.DataFrame({"day": recent.dt.date})
-                    .groupby("day").size().reset_index(name="new_players")
-                    .sort_values("day")
-                )
-    
-                ch_recent = alt.Chart(recent_by_day).mark_bar().encode(
-                    x=alt.X("day:T", title="Date"),
-                    y=alt.Y("new_players:Q", title="New players"),
-                    tooltip=[
-                        alt.Tooltip("day:T", title="Date"),
-                        alt.Tooltip("new_players:Q", title="New players")
-                    ]
-                ).properties(height=320, title="New Players (Last 14 Days)")
-    
-                # Display side-by-side with monthly chart
-                chart_cols = st.columns(2)
-                chart_cols[0].altair_chart(ch_month, use_container_width=True)
-                chart_cols[1].altair_chart(ch_recent, use_container_width=True)
-            else:
-                chart_cols[0].altair_chart(ch_month, use_container_width=True)
-                st.info("No new players in the last 14 days.")
+                    # ---- New players in last 14 days (tz-safe) ----
+        # Make "now" tz-naive to match created_parsed (datetime64[ns])
+        now_naive = pd.Timestamp.utcnow().tz_localize(None)
+        cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
+        
+        # Build mask & group by day
+        recent_mask = created_parsed >= cutoff_date
+        recent = created_parsed[recent_mask]
+        
+        if recent.notna().any():
+            recent_by_day = (
+                pd.DataFrame({"day": recent.dt.floor("D")})
+                .groupby("day").size().reset_index(name="new_players")
+                .sort_values("day")
+            )
+        
+            ch_recent = alt.Chart(recent_by_day).mark_bar().encode(
+                x=alt.X("day:T", title="Date"),
+                y=alt.Y("new_players:Q", title="New players"),
+                tooltip=[alt.Tooltip("day:T", title="Date"),
+                         alt.Tooltip("new_players:Q", title="New players")]
+            ).properties(height=320, title="New Players (Last 14 Days)")
+        
+            # Show side-by-side with monthly chart that you already computed as `ch_month`
+            chart_cols = st.columns(2)
+            chart_cols[0].altair_chart(ch_month, use_container_width=True)
+            chart_cols[1].altair_chart(ch_recent, use_container_width=True)
         else:
-            st.info("No valid 'createdAt' data to build player charts.")
+            chart_cols = st.columns(2)
+            chart_cols[0].altair_chart(ch_month, use_container_width=True)
+            chart_cols[1].write("No new players in the last 14 days.")
     # State distribution (US-only view)
     if "state" in fdf.columns:
         st.markdown("### Geography (States)")
