@@ -575,7 +575,7 @@ with tab_main:
         show_cols_default = [
             "username",
             "name",
-            "email"
+            "email",
             "contests_count_total",
             "lineups_count_total",
             "contests_participated",
