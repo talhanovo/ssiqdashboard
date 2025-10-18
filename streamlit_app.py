@@ -870,7 +870,7 @@ with tab_racing:
                 active_2plus = int(
                     racing_df[
                         (racing_df["activated_user"].fillna(False).astype(bool)) &
-                        (racing_df["contests_count_total"].fillna(0) >= 2)
+                        (racing_df["contests_count_total"].fillna(0) >= 1)
                     ].shape[0]
                 )
             # Display simple player verification stats
