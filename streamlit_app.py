@@ -864,6 +864,15 @@ with tab_racing:
             kyc_verified_count = int(ps_norm.isin(kyc_set).sum())
             banned_count = int(ps_norm.str.contains("banned", na=False).sum())
 
+            # Count users with activated_user == True and at least 2 contests
+            active_2plus = 0
+            if "activated_user" in racing_df.columns and "contests_count_total" in racing_df.columns:
+                active_2plus = int(
+                    racing_df[
+                        (racing_df["activated_user"].fillna(False).astype(bool)) &
+                        (racing_df["contests_count_total"].fillna(0) >= 2)
+                    ].shape[0]
+                )
             # Display simple player verification stats
             kpi_row = st.columns(5)
             kpi_row[0].metric("Players", f"{total_players:,}")
@@ -871,6 +880,7 @@ with tab_racing:
             kpi_row[1].metric("Non-Eligible State", f"{kyc_unverified_count:,}")
             kpi_row[2].metric("Eligible State", f"{kyc_verified_count:,}")
             kpi_row[3].metric("Banned", f"{banned_count:,}")
+            kpi_row[4].metric("Active User", f"{active_2plus:,}")
 
             st.markdown("---")
 
