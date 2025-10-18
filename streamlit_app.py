@@ -912,7 +912,7 @@ with tab_racing:
             st.markdown("### Racing Dudes Players")
             show_cols = [
                 "username", "name", "email", "country", "profile_status",
-                "createdAt", "contests_count_total", "usd_wallet_balance"
+                "createdAt", "contests_count_total", "lineups_count_total", "contests_participated", "activated_user", "wallet_balance", "feed_spent_total", "feed_won_total"
             ]
             show_cols = [c for c in show_cols if c in racing_df.columns]
             st.dataframe(racing_df[show_cols], use_container_width=True, hide_index=True)
