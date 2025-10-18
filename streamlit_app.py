@@ -855,11 +855,11 @@ with tab_racing:
             total_players = len(racing_df)
             ps_norm = racing_df["profile_status"].astype(str).str.strip().str.lower() if "profile_status" in racing_df.columns else pd.Series([], dtype="object")
 
-            unverified_set = {"unverified"}
+            #unverified_set = {"unverified"}
             kyc_unverified = {"unverified np"}
             kyc_set = {"grade-i", "grade-ii", "grade-iii", "unverified p"}
 
-            unverified_count = int(ps_norm.isin(unverified_set).sum())
+            #unverified_count = int(ps_norm.isin(unverified_set).sum())
             kyc_unverified_count = int(ps_norm.isin(kyc_unverified).sum())
             kyc_verified_count = int(ps_norm.isin(kyc_set).sum())
             banned_count = int(ps_norm.str.contains("banned", na=False).sum())
@@ -867,10 +867,10 @@ with tab_racing:
             # Display simple player verification stats
             kpi_row = st.columns(5)
             kpi_row[0].metric("Players", f"{total_players:,}")
-            kpi_row[1].metric("Singup Dropoff", f"{unverified_count:,}")
-            kpi_row[2].metric("Non-Eligible State", f"{unverified_count:,}")
-            kpi_row[3].metric("Eligible State", f"{kyc_verified_count:,}")
-            kpi_row[4].metric("Banned", f"{banned_count:,}")
+            #kpi_row[1].metric("Singup Dropoff", f"{unverified_count:,}")
+            kpi_row[1].metric("Non-Eligible State", f"{kyc_unverified_count:,}")
+            kpi_row[2].metric("Eligible State", f"{kyc_verified_count:,}")
+            kpi_row[3].metric("Banned", f"{banned_count:,}")
 
             st.markdown("---")
 
