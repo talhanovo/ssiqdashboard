@@ -877,30 +877,20 @@ with tab_racing:
             # --- Charts for this segment ---
             if "createdAt" in racing_df.columns:
                 created_parsed = pd.to_datetime(racing_df["createdAt"], errors="coerce")
-                monthly = (
-                    pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
-                    .dropna()
-                    .groupby("month").size().reset_index(name="new_players")
-                    .sort_values("month")
-                )
-
-                ch_month = alt.Chart(monthly).mark_bar().encode(
-                    x=alt.X("month:T", title="Month"),
-                    y=alt.Y("new_players:Q", title="New players"),
-                ).properties(height=300, title="New Racing Dudes Players by Month")
-
+            
+                # Only show line chart for new players in last 14 days
                 now_naive = pd.Timestamp.utcnow().tz_localize(None)
                 cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
                 recent_mask = created_parsed >= cutoff_date
                 recent = created_parsed[recent_mask]
-
+            
                 if recent.notna().any():
                     recent_by_day = (
                         pd.DataFrame({"day": recent.dt.floor("D")})
                         .groupby("day").size().reset_index(name="new_players")
                         .sort_values("day")
                     )
-
+            
                     ch_recent = (
                         alt.Chart(recent_by_day)
                         .mark_line(point=True)
@@ -910,11 +900,12 @@ with tab_racing:
                         )
                         .properties(height=300, title="New Racing Dudes Players (Last 14 Days)")
                     )
-
-                    ch_cols = st.columns(2)
-                    ch_cols[0].altair_chart(ch_month, use_container_width=True)
-                    ch_cols[1].altair_chart(ch_recent, use_container_width=True)
-
+            
+                    st.altair_chart(ch_recent, use_container_width=True)
+                else:
+                    st.info("No new players in the last 14 days.")
+            
+            
             st.markdown("---")
 
             # --- Table for these users ---
