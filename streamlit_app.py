@@ -860,6 +860,7 @@ with tab_racing:
             kyc_set = {"grade-i", "grade-ii", "grade-iii", "unverified p"}
 
             unverified_count = int(ps_norm.isin(unverified_set).sum())
+            kyc_unverified_count = int(ps_norm.isin(kyc_unverified).sum())
             kyc_verified_count = int(ps_norm.isin(kyc_set).sum())
             banned_count = int(ps_norm.str.contains("banned", na=False).sum())
 
