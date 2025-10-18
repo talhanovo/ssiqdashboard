@@ -884,6 +884,29 @@ with tab_racing:
 
             st.markdown("---")
 
+
+            # --- Signup Source Breakdown ---
+            if "signupSource" in racing_df.columns:
+                st.markdown("#### 🧭 Signup Source Breakdown")
+                signup_sources = racing_df["signupSource"].astype(str).str.strip().str.lower()
+            
+                source_counts = {
+                    "Website Promo CTA": int(signup_sources.eq("websitepromocta").sum()),
+                    "Landing Page CTA 1": int(signup_sources.eq("landingpagecta1").sum()),
+                    "Landing Page CTA 2": int(signup_sources.eq("landingpagecta2").sum()),
+                }
+            
+                src_cols = st.columns(3)
+                src_cols[0].metric("Website Promo CTA", f"{source_counts['Website Promo CTA']:,}")
+                src_cols[1].metric("Landing Page CTA 1", f"{source_counts['Landing Page CTA 1']:,}")
+                src_cols[2].metric("Landing Page CTA 2", f"{source_counts['Landing Page CTA 2']:,}")
+            
+                total_cta = sum(source_counts.values())
+                st.caption(f"Total CTA Signups: **{total_cta:,}** ({total_cta / total_players:.1%} of all Racing Dudes users)")
+            else:
+                st.info("No `signupSource` column found in this dataset.")
+
+            
             # --- Charts for this segment ---
             if "createdAt" in racing_df.columns:
                 created_parsed = pd.to_datetime(racing_df["createdAt"], errors="coerce")
@@ -935,3 +958,5 @@ with tab_racing:
                 file_name="racing_dudes_players.csv",
                 mime="text/csv"
             )
+
+
