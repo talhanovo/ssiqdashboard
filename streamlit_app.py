@@ -240,7 +240,7 @@ if load_btn and sheet_url_or_id:
 
 st.title("📊 Player Analytics Dashboard")
 
-tab_main, tab_beta = st.tabs(["All Users", "Beta Testing"])
+tab_main, tab_beta, tab_racing = st.tabs(["All Users", "Beta Testing", "Racing Dudes"])
 
 with st.expander("How to connect to your sheet", expanded=not load_btn):
     st.markdown(
@@ -826,3 +826,117 @@ with tab_beta:
                 ch_cols[0].altair_chart(ch_month, use_container_width=True)
                 ch_cols[1].altair_chart(ch_recent, use_container_width=True)
 
+
+with tab_racing:
+    st.subheader("🏇 Racing Dudes Metrics")
+
+    # --- Safely check for campaign_tags column ---
+    if "campaign_tags" not in df.columns:
+        st.warning("No `campaign_tags` column found in the dataset.")
+    else:
+        # Normalize the campaign_tags column to string for matching
+        fdf_racing = df.copy()
+        fdf_racing["campaign_tags"] = fdf_racing["campaign_tags"].astype(str).str.lower()
+
+        # Filter for any users that contain 'racing_dudes'
+        racing_df = fdf_racing[fdf_racing["campaign_tags"].str.contains("racing_dudes", na=False)].copy()
+
+        if racing_df.empty:
+            st.info("No users found with campaign_tags containing 'racing_dudes'.")
+        else:
+            st.caption(f"Found **{len(racing_df):,}** Racing Dudes user(s).")
+
+            # --- Compute Key Metrics (same pattern as other tabs) ---
+            total_players = len(racing_df)
+            ps_norm = racing_df["profile_status"].astype(str).str.strip().str.lower() if "profile_status" in racing_df.columns else pd.Series([], dtype="object")
+
+            unverified_set = {"unverified"}
+            kyc_set = {"grade-i", "grade-ii", "grade-iii"}
+
+            unverified_count = int(ps_norm.isin(unverified_set).sum())
+            kyc_verified_count = int(ps_norm.isin(kyc_set).sum())
+            banned_count = int(ps_norm.str.contains("banned", na=False).sum())
+
+            usd_spent = racing_df["usd_spent_total"].fillna(0).sum()
+            usd_won = racing_df["usd_won_total"].fillna(0).sum()
+            usd_deposit = racing_df["usd_deposit_total"].fillna(0).sum()
+            usd_withdraw = racing_df["usd_withdraw_net_total"].fillna(0).sum()
+            usd_net = racing_df["usd_net_total"].fillna(0).sum()
+            usd_wallet = racing_df["usd_wallet_balance"].fillna(0).sum()
+
+            st.markdown("#### 💵 Racing Dudes — All-Time USD Metrics")
+            cols = st.columns(6)
+            cols[0].metric("USD Deposits ($)", f"${usd_deposit:,.0f}")
+            cols[1].metric("USD Withdrawals ($)", f"${usd_withdraw:,.0f}")
+            cols[2].metric("USD Spent ($)", f"${usd_spent:,.0f}")
+            cols[3].metric("USD Won ($)", f"${usd_won:,.0f}")
+            cols[4].metric("USD Net ($)", f"${usd_net:,.0f}")
+            cols[5].metric("USD in Wallets ($)", f"${usd_wallet:,.0f}")
+
+            # ROI metric
+            if usd_spent > 0:
+                st.metric("Pooled ROI (won/spent)", f"{usd_won / usd_spent:,.2f}×")
+            else:
+                st.metric("Pooled ROI (won/spent)", "–")
+
+            st.markdown("---")
+
+            # --- Charts for this segment ---
+            if "createdAt" in racing_df.columns:
+                created_parsed = pd.to_datetime(racing_df["createdAt"], errors="coerce")
+                monthly = (
+                    pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
+                    .dropna()
+                    .groupby("month").size().reset_index(name="new_players")
+                    .sort_values("month")
+                )
+
+                ch_month = alt.Chart(monthly).mark_bar().encode(
+                    x=alt.X("month:T", title="Month"),
+                    y=alt.Y("new_players:Q", title="New players"),
+                ).properties(height=300, title="New Racing Dudes Players by Month")
+
+                now_naive = pd.Timestamp.utcnow().tz_localize(None)
+                cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
+                recent_mask = created_parsed >= cutoff_date
+                recent = created_parsed[recent_mask]
+
+                if recent.notna().any():
+                    recent_by_day = (
+                        pd.DataFrame({"day": recent.dt.floor("D")})
+                        .groupby("day").size().reset_index(name="new_players")
+                        .sort_values("day")
+                    )
+
+                    ch_recent = (
+                        alt.Chart(recent_by_day)
+                        .mark_line(point=True)
+                        .encode(
+                            x=alt.X("day:T", title="Date"),
+                            y=alt.Y("new_players:Q", title="New players"),
+                        )
+                        .properties(height=300, title="New Racing Dudes Players (Last 14 Days)")
+                    )
+
+                    ch_cols = st.columns(2)
+                    ch_cols[0].altair_chart(ch_month, use_container_width=True)
+                    ch_cols[1].altair_chart(ch_recent, use_container_width=True)
+
+            st.markdown("---")
+            # --- Table for these users ---
+            st.markdown("### Racing Dudes Players")
+            show_cols = [
+                "username", "name", "email", "country", "usd_wallet_balance",
+                "usd_spent_total", "usd_won_total", "usd_deposit_total", "usd_withdraw_net_total",
+            ]
+            show_cols = [c for c in show_cols if c in racing_df.columns]
+            st.dataframe(racing_df[show_cols], use_container_width=True, hide_index=True)
+
+            # CSV export
+            csv = racing_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Download Racing Dudes CSV",
+                csv,
+                file_name="racing_dudes_players.csv",
+                mime="text/csv"
+            )
