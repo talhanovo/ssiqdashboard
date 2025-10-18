@@ -50,6 +50,135 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
+
+# ==========================================
+# MongoDB Data Fetch (automated)
+# ==========================================
+from pymongo import MongoClient
+from Crypto.Cipher import AES
+import base64, hashlib, json
+
+AES_PASSWORD = st.secrets["aes"]["password"]
+
+def _looks_like_cryptojs(ciphertext_b64: str) -> bool:
+    try:
+        raw = base64.b64decode(ciphertext_b64)
+        return raw.startswith(b"Salted__") and len(raw) > 16
+    except Exception:
+        return False
+
+def evp_bytes_to_key(password: bytes, salt: bytes, key_len: int, iv_len: int):
+    d, last = b"", b""
+    while len(d) < key_len + iv_len:
+        last = hashlib.md5(last + password + salt).digest()
+        d += last
+    return d[:key_len], d[key_len:key_len + iv_len]
+
+def aes_decrypt_cryptojs(ciphertext_b64: str, password: str) -> str:
+    if not password or not _looks_like_cryptojs(ciphertext_b64):
+        return ciphertext_b64
+    try:
+        raw = base64.b64decode(ciphertext_b64)
+        salt = raw[8:16]
+        enc = raw[16:]
+        key, iv = evp_bytes_to_key(password.encode("utf-8"), salt, 32, 16)
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        dec = cipher.decrypt(enc)
+        pad_len = dec[-1]
+        return dec[:-pad_len].decode("utf-8")
+    except Exception:
+        return ciphertext_b64
+
+@st.cache_data(show_spinner=True)
+def fetch_data_from_mongo():
+    st.info("Fetching latest data from MongoDB… this may take 1–2 minutes ⏳")
+
+    client = MongoClient(st.secrets["mongo"]["uri"])
+    db = client[st.secrets["mongo"]["database"]]
+    users = db["players"]
+    wallets = db["wallets"]
+    txs = db["transactions"]
+    contests = db["contests"]
+
+    import datetime
+    two_weeks_ago = datetime.datetime.utcnow() - datetime.timedelta(days=14)
+
+    data = []
+    for user in users.find():
+        uid = user.get("_id")
+
+        # Core user fields
+        name = aes_decrypt_cryptojs(user.get("name", ""), AES_PASSWORD)
+        phone = aes_decrypt_cryptojs(user.get("phone", ""), AES_PASSWORD)
+
+        # Simple wallet balance
+        wallet = wallets.find_one({"player": uid}, {"dollar_balance": 1, "balance": 1})
+        usd_wallet_balance = float(wallet.get("dollar_balance", 0) or 0) if wallet else 0
+
+        # USD transactions
+        usd_spent_total = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Virtual Dollar Contest Fee", "operation": "Deduct"}))
+        usd_won_total = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Prize Money Dollars", "operation": "Add"}))
+        usd_deposit_total = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Virtual Dollar Balance", "operation": "Add"}))
+        usd_withdraw_gross_total = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Withdrawal", "operation": "Deduct"}))
+        usd_withdraw_refund_total = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Withdrawal Refund", "operation": "Add"}))
+        usd_withdraw_net_total = usd_withdraw_gross_total - usd_withdraw_refund_total
+        usd_net_total = usd_deposit_total + usd_won_total - usd_spent_total - usd_withdraw_net_total
+
+        # USD 14d
+        recent_filter = {"$gte": two_weeks_ago}
+        usd_spent_14d = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Virtual Dollar Contest Fee", "operation": "Deduct", "createdAt": recent_filter}))
+        usd_won_14d = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Prize Money Dollars", "operation": "Add", "createdAt": recent_filter}))
+        usd_deposit_14d = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Virtual Dollar Balance", "operation": "Add", "createdAt": recent_filter}))
+        usd_withdraw_gross_14d = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Withdrawal", "operation": "Deduct", "createdAt": recent_filter}))
+        usd_withdraw_refund_14d = sum(float(t.get("amount", 0)) for t in txs.find({"player": uid, "type": "Withdrawal Refund", "operation": "Add", "createdAt": recent_filter}))
+        usd_withdraw_net_14d = usd_withdraw_gross_14d - usd_withdraw_refund_14d
+        usd_net_14d = usd_deposit_14d + usd_won_14d - usd_spent_14d - usd_withdraw_net_14d
+
+        # Contest counts
+        contests_cursor = contests.find({"sorted_contest_positions.playerId": uid})
+        contest_count, lineup_count = 0, 0
+        for c in contests_cursor:
+            for p in c.get("sorted_contest_positions", []):
+                if p.get("playerId") == uid:
+                    lineup_count += 1
+            contest_count += 1
+
+        activated_user = contest_count >= 2
+        active_user = lineup_count > 0
+
+        data.append({
+            "_id": str(uid),
+            "username": user.get("username", ""),
+            "email": user.get("email", ""),
+            "name": name,
+            "phone": phone,
+            "country": user.get("country", ""),
+            "state": user.get("state", ""),
+            "profile_status": user.get("profile_status", ""),
+            "signupSource": user.get("signupSource", ""),
+            "campaign_tags": user.get("campaign_tags", ""),
+            "createdAt": user.get("createdAt"),
+            "activated_user": activated_user,
+            "active_user": active_user,
+            "contests_count_total": contest_count,
+            "usd_wallet_balance": usd_wallet_balance,
+            "usd_spent_total": usd_spent_total,
+            "usd_won_total": usd_won_total,
+            "usd_deposit_total": usd_deposit_total,
+            "usd_withdraw_net_total": usd_withdraw_net_total,
+            "usd_net_total": usd_net_total,
+            "usd_spent_14d": usd_spent_14d,
+            "usd_won_14d": usd_won_14d,
+            "usd_deposit_14d": usd_deposit_14d,
+            "usd_withdraw_net_14d": usd_withdraw_net_14d,
+            "usd_net_14d": usd_net_14d,
+        })
+
+    df = pd.DataFrame(data)
+    return df
+
+
+
 # -----------------------------
 # Helpers: Data Loading
 # -----------------------------
@@ -222,21 +351,56 @@ if use_cache_bust:
 df: pd.DataFrame = pd.DataFrame()
 load_error: Optional[str] = None
 
-if load_btn and sheet_url_or_id:
+
+# ===============================
+# Data Loading (Auto + Fallback)
+# ===============================
+
+st.sidebar.header("🔗 Data Source")
+load_mode = st.sidebar.radio(
+    "Data source mode:",
+    ["MongoDB (live auto-fetch)", "CSV Export (fallback)"],
+    help="Use MongoDB for automated fetching, or CSV export as backup."
+)
+
+use_cache_bust = st.sidebar.checkbox("Force refresh (bust cache)", value=False)
+load_btn = st.sidebar.button("Load Data", type="primary")
+
+if "_cache_bust" not in st.session_state:
+    st.session_state._cache_bust = 0
+if use_cache_bust:
+    st.session_state._cache_bust += 1
+
+df = pd.DataFrame()
+load_error = None
+
+if load_mode.startswith("MongoDB"):
     try:
-        if mode.startswith("CSV"):
+        # Securely load password from secrets
+        AES_PASSWORD = st.secrets["aes"]["password"]
+        df = fetch_data_from_mongo()  # <--- your Mongo auto-fetch function from above
+        df = clean(df)
+        st.success(f"✅ Loaded {len(df):,} users from MongoDB.")
+    except Exception as e:
+        st.warning(f"⚠️ MongoDB load failed: {e}")
+        st.info("Falling back to CSV import… please provide your Google Sheet URL below.")
+        load_mode = "CSV Export (fallback)"  # Switch to CSV mode automatically
+
+if load_mode.startswith("CSV Export"):
+    sheet_url_or_id = st.sidebar.text_input("Google Sheet URL or ID")
+    worksheet_name = st.sidebar.text_input("Worksheet name (optional)")
+
+    if load_btn and sheet_url_or_id:
+        try:
             df = load_from_csv_export(
                 sheet_url_or_id + f"?cache_bust={st.session_state._cache_bust}",
                 worksheet_name or None
             )
-        else:
-            sid = _extract_sheet_id(sheet_url_or_id) or sheet_url_or_id
-            if not worksheet_name:
-                raise RuntimeError("Worksheet name is required for gspread mode.")
-            df = load_from_gspread(sid, worksheet_name)
-        df = clean(df)
-    except Exception as e:
-        load_error = str(e)
+            df = clean(df)
+            st.success(f"✅ Loaded {len(df):,} rows from Google Sheet.")
+        except Exception as e:
+            st.error(f"❌ Failed to load CSV: {e}")
+
 
 st.title("📊 Player Analytics Dashboard")
 
