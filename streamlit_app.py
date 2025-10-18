@@ -842,7 +842,7 @@ with tab_racing:
 
         # Further filter out junk/test emails
         if "email" in racing_df.columns:
-            exclude_keywords = ["test", "yopmail", "ralls"]
+            exclude_keywords = ["test", "yopmail", "ralls", "plutus21"]
             pattern = "|".join(exclude_keywords)
             racing_df = racing_df[~racing_df["email"].astype(str).str.contains(pattern, case=False, na=False)]
 
