@@ -864,7 +864,7 @@ with tab_racing:
             banned_count = int(ps_norm.str.contains("banned", na=False).sum())
 
             # Display simple player verification stats
-            kpi_row = st.columns(4)
+            kpi_row = st.columns(5)
             kpi_row[0].metric("Players", f"{total_players:,}")
             kpi_row[1].metric("Singup Dropoff", f"{unverified_count:,}")
             kpi_row[2].metric("Non-Eligible State", f"{unverified_count:,}")
