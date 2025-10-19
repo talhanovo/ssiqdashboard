@@ -332,15 +332,8 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 # -----------------------------
 st.set_page_config(page_title="Player Analytics Dashboard", page_icon="📊", layout="wide")
 
-st.sidebar.header("🔗 Data Source")
-mode = st.sidebar.radio("Load method", ["CSV Export (public)", "gspread (private)"])
 
-sheet_url_or_id = st.sidebar.text_input("Google Sheet URL or ID", help="Paste the full Google Sheet URL or just the Sheet ID.")
-worksheet_name = st.sidebar.text_input("Worksheet name (optional)")
 
-use_cache_bust = st.sidebar.checkbox("Force refresh (bust cache)", value=False)
-
-load_btn = st.sidebar.button("Load Data", type="primary")
 
 if "_cache_bust" not in st.session_state:
     st.session_state._cache_bust = 0
