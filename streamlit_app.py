@@ -255,10 +255,15 @@ TEXT_SEARCH_COLS = ["_id", "username", "email", "name", "referral_code", "phone"
 
 
 def parse_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Parse all known date columns and make them timezone-naive for consistency."""
     for col in DATE_COLS:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+            df[col] = (
+                pd.to_datetime(df[col], errors="coerce", utc=True)
+                .dt.tz_localize(None)
+            )
     return df
+
 
 
 def to_numeric(df: pd.DataFrame) -> pd.DataFrame:
