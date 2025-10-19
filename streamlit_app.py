@@ -426,7 +426,7 @@ with tab_main:
     
         # Date range filter (createdAt) — robust to mixed types/empty strings/NaN
         if "createdAt" in df.columns:
-            created_series = pd.to_datetime(df["createdAt"], errors="coerce")
+            created_series = pd.to_datetime(fdf["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
             if created_series.notna().any():
                 min_date = created_series.min()
                 max_date = created_series.max()
@@ -942,7 +942,7 @@ with tab_beta:
 
         # Charts reuse (Monthly + 14d)
         if "createdAt" in fdf.columns:
-            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
+            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
             monthly = (
                 pd.DataFrame({"month": created_parsed.dt.to_period("M").dt.to_timestamp()})
                 .dropna()
@@ -1064,7 +1064,7 @@ with tab_racing:
             
             # --- Charts for this segment ---
             if "createdAt" in racing_df.columns:
-                created_parsed = pd.to_datetime(racing_df["createdAt"], errors="coerce")
+                created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
             
                 # Only show line chart for new players in last 14 days
                 now_naive = pd.Timestamp.utcnow().tz_localize(None)
