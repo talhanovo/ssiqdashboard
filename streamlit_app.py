@@ -333,13 +333,6 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 st.set_page_config(page_title="Player Analytics Dashboard", page_icon="📊", layout="wide")
 
 
-
-
-if "_cache_bust" not in st.session_state:
-    st.session_state._cache_bust = 0
-if use_cache_bust:
-    st.session_state._cache_bust += 1
-
 # DataFrame placeholder
 df: pd.DataFrame = pd.DataFrame()
 load_error: Optional[str] = None
