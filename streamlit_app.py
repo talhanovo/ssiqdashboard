@@ -1067,13 +1067,20 @@ with tab_racing:
             
             # --- Charts for this segment ---
             if "createdAt" in racing_df.columns:
-                created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
+                # Normalize timestamps safely (handles tz-aware + tz-naive)
+                created_parsed = (
+                    pd.to_datetime(racing_df["createdAt"], errors="coerce", utc=True)
+                    .dt.tz_localize(None)
+                )
             
-                # Only show line chart for new players in last 14 days
+                # Compute cutoff (14 days ago, tz-naive UTC-normalized)
                 now_naive = pd.Timestamp.utcnow().tz_localize(None)
                 cutoff_date = (now_naive - pd.Timedelta(days=14)).normalize()
+            
+                # Filter for players created in last 14 days
                 recent_mask = created_parsed >= cutoff_date
-                recent = created_parsed[recent_mask]
+                recent = created_parsed.loc[recent_mask]
+
             
                 if recent.notna().any():
                     recent_by_day = (
