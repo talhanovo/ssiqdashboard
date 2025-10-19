@@ -462,12 +462,15 @@ with tab_main:
         fdf = df.copy()
     
         # Date filter
+        # Date filter
         if start_date and end_date and "createdAt" in fdf.columns:
-            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce")
+            # Parse safely to tz-naive
+            created_parsed = pd.to_datetime(fdf["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
             left = pd.to_datetime(start_date)
             right = pd.to_datetime(end_date) + pd.Timedelta(days=1)  # inclusive end
             mask_date = created_parsed.between(left, right, inclusive="left").fillna(False)
             fdf = fdf[mask_date]
+
     
         # Status filter
         if status_sel and "status_simple" in fdf.columns:
