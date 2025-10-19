@@ -426,7 +426,7 @@ with tab_main:
     
         # Date range filter (createdAt) — robust to mixed types/empty strings/NaN
         if "createdAt" in df.columns:
-            created_series = pd.to_datetime(fdf["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
+            created_series = pd.to_datetime(df["createdAt"], errors="coerce", utc=True).dt.tz_localize(None)
             if created_series.notna().any():
                 min_date = created_series.min()
                 max_date = created_series.max()
